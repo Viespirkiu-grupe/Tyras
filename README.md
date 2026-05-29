@@ -1,4 +1,4 @@
-# Tyras — Lietuvos viešųjų pirkimų sukčiavimo tyrimo agentinė sistema
+# Tyras — Lietuvos viešųjų pirkimų sukčiavimų tyrimų agentinė sistema
 
 Daugiagentė sistema veikianti su Claude Code, skirta tirti viešųjų pirkimų sukčiavimą Lietuvoje. Agentai naudoja
 [Viešpirkiai MCP](https://viespirkiai.org/mcp), kuris leidžia tyrinėti pirkimo sutartis, įmonių registrą, teismo bylas
