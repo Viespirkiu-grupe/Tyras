@@ -11,11 +11,11 @@ rekomendacijomis dėl susisiekimo su priežiūros institucijoms kaip STT, FNTT, 
 
 1. Sukurkite Claude paskyrą, eikite į Customize → Connectors → Add custom connector → ir pridėkite
    `https://viespirkiai.org/mcp`
-2. Įsigykite Claude Pro planą, įdiekite Claude CLI
+2. Įsigykite [Claude Pro planą](https://claude.com/pricing), įdiekite [Claude Code](https://code.claude.com/docs/en/quickstart)
 3. [Atsisiųskite šį repozitorių](https://github.com/Viespirkiu-grupe/Tyras/archive/refs/heads/main.zip) arba naudokite
    Git: `git clone https://github.com/Viespirkiu-grupe/Tyras.git`
 4. Atidarykite terminalą, eikite į šio repozitoriaus šakninį aplanką `Tyras/` ir paleiskite `claude` komandą.
-5. Įveskite `/mcp` ir patikrinkite, ar Viešpirkiai MCP serveris pasiekiamas.
+5. Įveskite `/mcp` ir patikrinkite, ar [Viešpirkiai MCP serveris](https://viespirkiai.org/mcp) pasiekiamas.
 6. Įveskite `/agents` ir pasirinkite Library → `fraud-procurement-investigation-planner`.
 7. Įrašykite pradinę tyrimo užklausą, pvz.:
 
