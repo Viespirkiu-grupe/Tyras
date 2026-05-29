@@ -1,16 +1,20 @@
-# Tyras — Lithuanian Public Procurement Fraud Investigation Agentic System
+# Tyras — Lietuvos viešųjų pirkimų sukčiavimo tyrimo agentinė sistema
 
-A multi-agent Claude Code system for investigating public procurement fraud in Lithuania. Agents query a Viešpirkiai MCP
-server that exposes procurement contracts, company registry, court cases, and PINREG declarations, then produce
-structured investigation reports with supervisory authority referral recommendations.
+Daugiagentė sistema veikianti su Claude Code, skirta tirti viešųjų pirkimų sukčiavimą Lietuvoje. Agentai naudoja
+[Viešpirkiai MCP](https://viespirkiai.org/mcp), kuris leidžia tyrinėti pirkimo sutartis, įmonių registrą, teismo bylas
+ir PINREG deklaracijas. Ši agentinė sistema geba planuoti tyrimą, jį vykdyti bei parengti tyrimo ataskaitas su
+rekomendacijomis dėl susisiekimo su priežiūros institucijoms kaip STT, FNTT, VPT, VK ir KT.
 
 ---
 
-1. Create Claude account, go to Customize → Connectors → Add custom connector → add `https://viespirkiai.org/mcp`
-2. Get Claude Pro plan, install Claude CLI and execute `claude` in the root of this repository.
-3. Type `/mcp` to see if the Viešpirkiai MCP server is available.
-4. Type `/agents` and select Library → `fraud-procurement-investigation-planner`.
-5. Write down an initial investigation query in the prompt, e.g.
+## Greitas startas
+
+1. Sukurkite Claude paskyrą, eikite į Customize → Connectors → Add custom connector → pridėkite
+   `https://viespirkiai.org/mcp`
+2. Įsigykite Claude Pro planą, įdiekite Claude CLI ir vykdykite `claude` šios saugyklos šakniniame kataloge.
+3. Įveskite `/mcp` ir patikrinkite, ar Viešpirkiai MCP serveris pasiekiamas.
+4. Įveskite `/agents` ir pasirinkite Library → `fraud-procurement-investigation-planner`.
+5. Įrašykite pradinę tyrimo užklausą, pvz.:
 
 ```text
 Ar gali pereiti per pagrindines institucijas, patikrinti IT paslaugų pirkimo konkursus, pasižiūrėti kas laimėjo kiekvieną etapą ir matant didesnę imtį paieškoti sąsajų.
@@ -18,88 +22,88 @@ Vienas iš rizikos veiksnių yra nedidelė techninės specifikacijos paruošimo 
 Apimtis (Scope) yra sveikatos ministerija ir visos sveikatos ministerijai pavaldžias institucijas.
 ```
 
-6. Nothing to do next, just watch the agents work! The planner will parse your query, select relevant fraud themes, and
-   spawn investigator agents to run MCP queries. Finally, a reporter agent will synthesize the findings into a
-   structured report with referral recommendations. Find `report.md` in the `investigations/` folder.
+Daugiau nieko daryti nereikia — tiesiog stebėkite, kaip dirba agentai! Planuotojas išanalizuos jūsų užklausą, parinks
+tinkamas sukčiavimo temas ir sukurs tyrėjų agentus MCP užklausoms vykdyti. Galiausiai reporterio agentas apibendrins
+išvadas į struktūrizuotą ataskaitą su rekomendacijomis. `report.md` rasite aplanke `investigations/`.
 
-> Usually a single investigation task about 30 minutes and costs one third of your session tokens.
+> Paprastai vienas tyrimas trunka apie 30 minučių ir sunaudoja trečdalį sesijos žetonų.
 
 ---
 
-## Agent Overview
+## Agentų apžvalga
 
 ### `fraud-procurement-investigation-planner`
 
-Bootstraps an investigation from a case prompt. Parses the case, queries MCP once for all named entities (companies
-and individuals), selects relevant fraud themes from the 27-theme library, then writes the shared dossier and
-investigation plan. Spawns the first investigator agent to begin the theme chain.
+Inicijuoja tyrimą pagal bylos aprašymą. Išanalizuoja bylą, vieną kartą klausinėja MCP visų pavadintų subjektų (įmonių ir
+asmenų), iš 27 temų bibliotekos parenka aktualias sukčiavimo temas, tada parašo bendrą dossier ir tyrimo planą. Sukuria
+pirmąjį tyrėjo agentą temų grandinei pradėti.
 
-**Trigger:** User describes a case — e.g. _"Investigate a 5M EUR municipal road contract awarded to UAB Xyz in 2024;
-allegations of bid rigging and conflict of interest."_
+**Paleidimas:** Vartotojas aprašo tyrimo tikslą — pvz. _„Ar gali pereiti per pagrindines institucijas, patikrinti IT paslaugų
+pirkimo konkursus..."_
 
 ---
 
 ### `fraud-procurement-investigation-investigator`
 
-Executes one fraud theme per instance. Reads the shared dossier and all prior theme findings, then runs
-theme-specific MCP queries (aggregations, document searches, SQL over procurement views). Writes its findings file,
-appends a summary to the dossier, and spawns the next investigator — or the reporter if it is the last theme.
+Kiekviena instancija vykdo vieną sukčiavimo temą. Nuskaito bendrą dossier ir visas ankstesnes temų išvadas, tada vykdo
+temai būdingas MCP užklausas (agregacijas, dokumentų paieškas, SQL per pirkimų rodinius). Parašo savo išvadų failą,
+prideda santrauką prie dossier ir sukuria kitą tyrėją arba reporterį, jei tai paskutinė tema.
 
-**Always spawned by the planner or a prior investigator. Never triggered directly.**
+**Visada sukuriamas planuotojo arba ankstesnio tyrėjo. Tiesiogiai nepaleidžiamas.**
 
 ---
 
 ### `fraud-procurement-investigation-reporter`
 
-Synthesis agent — no MCP queries. Reads the dossier and all theme findings files, identifies cross-theme patterns,
-and writes the final investigation report. Includes an evidence inventory, entity summary, and a ready-to-use
-supervisory authority referral section (STT / FNTT / VPT / VK / KT).
+Sintezės agentas MCP užklausų nevykdo. Nuskaito dossier ir visus temų išvadų failus, nustato tarptemines sąsajas ir
+parašo galutinę tyrimo ataskaitą. Apima įrodymų inventorių, subjektų santrauką ir parengtą skyrių su rekomendacijomis
+dėl kontaktavimo su priežiūros institucijoms (STT / FNTT / VPT / VK / KT).
 
-**Always spawned by the last investigator agent. Never triggered directly.**
+**Visada sukuriamas paskutinio tyrėjo agento. Tiesiogiai nepaleidžiamas.**
 
 ---
 
-## Agent Flow
+## Agentų darbo eiga
 
 ```mermaid
 flowchart TD
-    User(["User: case prompt"]) --> Planner
+    User(["Vartotojas: bylos aprašymas"]) --> Planner
 
     subgraph Planner["fraud-procurement-investigation-planner"]
-        P1["Parse case\n(entities, alleged fraud types)"]
-        P2["Query MCP once\nfor all named entities"]
-        P3["Select themes from\n27-theme library"]
-        P4["Write dossier.md\n+ plan.md"]
+        P1["Išanalizuoja bylą\n(subjektai, tariami sukčiavimo tipai)"]
+        P2["Vieną kartą klausinėja MCP\nvisų pavadintų subjektų"]
+        P3["Parenka temas iš\n27 temų bibliotekos"]
+        P4["Parašo dossier.md\n+ plan.md"]
         P1 --> P2 --> P3 --> P4
     end
 
-    Planner -->|" spawns with theme 1 context "| Inv1
+    Planner -->|" sukuria su 1 temos kontekstu "| Inv1
 
-    subgraph Inv1["fraud-procurement-investigation-investigator (theme 1)"]
-        I1a["Read dossier + prior themes"]
-        I1b["Read theme document\nfrom docs/themes/"]
-        I1c["Run theme-specific\nMCP queries"]
-        I1d["Write theme-01-*.md\nAppend to dossier"]
+    subgraph Inv1["fraud-procurement-investigation-investigator (tema 1)"]
+        I1a["Nuskaito dossier + ankstesnes temas"]
+        I1b["Nuskaito temos dokumentą\niš docs/themes/"]
+        I1c["Vykdo temai būdingas\nMCP užklausas"]
+        I1d["Parašo theme-01-*.md\nPrideda prie dossier"]
         I1a --> I1b --> I1c --> I1d
     end
 
-    Inv1 -->|" spawns with theme 2 context "| Inv2
+    Inv1 -->|" sukuria su 2 temos kontekstu "| Inv2
 
-    subgraph Inv2["fraud-procurement-investigation-investigator (theme 2..N)"]
-        I2a["Read dossier + prior themes"]
-        I2b["Read theme document"]
-        I2c["Run theme-specific\nMCP queries"]
-        I2d["Write theme-NN-*.md\nAppend to dossier"]
+    subgraph Inv2["fraud-procurement-investigation-investigator (tema 2..N)"]
+        I2a["Nuskaito dossier + ankstesnes temas"]
+        I2b["Nuskaito temos dokumentą"]
+        I2c["Vykdo temai būdingas\nMCP užklausas"]
+        I2d["Parašo theme-NN-*.md\nPrideda prie dossier"]
         I2a --> I2b --> I2c --> I2d
     end
 
-    Inv2 -->|" ...continues for each theme... "| InvN["investigator (theme N — last)"]
-    InvN -->|" spawns reporter "| Reporter
+    Inv2 -->|" ...tęsiasi kiekvienai temai... "| InvN["tyrėjas (tema N — paskutinė)"]
+    InvN -->|" sukuria reporterį "| Reporter
 
     subgraph Reporter["fraud-procurement-investigation-reporter"]
-        R1["Read dossier\n+ all theme files"]
-        R2["Synthesize cross-theme\npatterns"]
-        R3["Write report.md\nwith referral recommendations"]
+        R1["Nuskaito dossier\n+ visus temų failus"]
+        R2["Sintezuoja tarptemines\nsąsajas"]
+        R3["Parašo report.md\nsu rekomendacijomis"]
         R1 --> R2 --> R3
     end
 
@@ -108,63 +112,51 @@ flowchart TD
 
 ---
 
-## Investigation Workspace
+## Tyrimo darbo katalogas
 
-Each case is stored under `investigations/<case-id>/` (format: `inv-YYYY-NNN`):
+Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `inv-YYYY-NNN`):
 
-| File                 | Written by                   | Purpose                                         |
-|----------------------|------------------------------|-------------------------------------------------|
-| `dossier.md`         | Planner                      | Shared entity data; all agents read this        |
-| `plan.md`            | Planner                      | Selected themes and per-theme query plans       |
-| `theme-NN-<name>.md` | Investigator (one per theme) | Theme findings and raw MCP data                 |
-| `report.md`          | Reporter                     | Final report with referral recommendations      |
-| `TOBULINTI.md`       | All agents                   | MCP tool failures and data gaps (feedback loop) |
+| Failas               | Parašo                              | Paskirtis                                                  |
+|----------------------|-------------------------------------|------------------------------------------------------------|
+| `dossier.md`         | Planuotojas                         | Bendri subjektų duomenys; visi agentai nuskaito            |
+| `plan.md`            | Planuotojas                         | Parinktos temos ir temų užklausų planai                    |
+| `theme-NN-<name>.md` | Tyrėjas (po vieną kiekvienai temai) | Temų išvados ir neapdoroti MCP duomenys                    |
+| `report.md`          | Reporteris                          | Galutinė ataskaita su rekomendacijomis                     |
+| `TOBULINTI.md`       | Visi agentai                        | MCP įrankių klaidos ir duomenų spragos (grįžtamasis ryšys) |
 
 ---
 
-## Theme Library
+## Temų biblioteka
 
-27 fraud detection themes in `docs/themes/`. Reference index and MCP tool rules:
+27 sukčiavimo aptikimo temos aplanke `docs/themes/`. Rodyklė ir MCP įrankių taisyklės:
 `docs/index/mcp-investigator-prompt.md`.
 
-| #  | Theme                                                                  | Primary entities                 |
-|----|------------------------------------------------------------------------|----------------------------------|
-| 1  | Shell company / capacity mismatch                                      | company, contract                |
-| 2  | Bid rigging / cover bidding                                            | company, tender                  |
-| 3  | Bid rotation carousel                                                  | company, tender                  |
-| 4  | Conflict of interest — shared people between buyer and seller          | person, company                  |
-| 5  | Contract splitting to avoid thresholds                                 | contract, tender                 |
-| 6  | Geographic monopoly / local capture                                    | company, contract, buyer         |
-| 7  | Procedure manipulation / unjustified direct award                      | tender, contract, buyer          |
-| 8  | Price anomalies / over-invoicing / scope creep                         | contract                         |
-| 9  | Compliance and blacklist cross-check                                   | company, person, case            |
-| 10 | Network — second-degree connections and corporate webs                 | company, person                  |
-| 11 | UBO risk — beneficial ownership through holding layers                 | company, person                  |
-| 12 | EU structural funds abuse / fictitious subcontractors                  | company, contract                |
-| 13 | Revolving door — procurement officer joins winning supplier            | person                           |
-| 14 | Spec rigging — technical specifications written for one supplier       | company, tender, buyer           |
-| 15 | Framework agreement abuse / single-supplier call-offs                  | company, contract, buyer         |
-| 16 | Shared back-office — competing companies with same address or domain   | company                          |
-| 17 | Price cartel — suspiciously uniform bid prices                         | company, tender                  |
-| 18 | Contract amendment escalation — low bid inflate through amendments     | contract, buyer                  |
-| 19 | Municipal company favouritism — buyer awards to own subsidiary         | company, contract, buyer         |
-| 20 | Restricted procedure manipulation — buyer hand-picks invitees          | tender, buyer                    |
-| 21 | Political connection favouritism — companies linked to party donors    | person, company                  |
-| 22 | Fictitious deliverables — contract marked complete but work never done | contract, case                   |
-| 23 | Vendor lock-in / incumbent supplier structural monopoly                | company, contract                |
-| 24 | EU funds irregularities and cross-border fraud patterns                | company, contract, case          |
-| 25 | Money laundering indicators around procurement flows                   | company, person, case            |
-| 26 | Systemic internal control weaknesses in buyers                         | buyer                            |
-| 27 | Sector-specific red flags (healthcare, construction, IT)               | company, contract, tender, buyer |
-
----
-
-## Supervisory Authorities
-
-| Authority                                        | Mandate                                                   | Contact           |
-|--------------------------------------------------|-----------------------------------------------------------|-------------------|
-| **STT** — Specialiųjų tyrimų tarnyba             | Corruption, abuse of office, conflict of interest         | report@stt.lt     |
-| **FNTT** — Finansinių nusikaltimų tyrimo tarnyba | Financial crime, money laundering, EU funds fraud         | fntt.lrv.lt       |
-| **VPT** — Viešųjų pirkimų tarnyba                | Procurement law compliance, procedural violations         | info@vpt.lt       |
-| **VK** — Valstybės kontrolė                      | National audit, systemic weaknesses, EU funds eligibility | info@vkontrole.lt |
-| **KT** — Konkurencijos taryba                    | Cartels, bid rigging, anti-competitive agreements         | tarnyba@kt.gov.lt |
+| #  | Tema                                                                               | Pagrindiniai subjektai               |
+|----|------------------------------------------------------------------------------------|--------------------------------------|
+| 1  | Fiktyvios įmonės / pajėgumų neatitikimas                                           | įmonė, sutartis                      |
+| 2  | Pasiūlymų suokalbis / fiktyvūs konkurentai                                         | įmonė, konkursas                     |
+| 3  | Pasiūlymų rotacijos karuselė                                                       | įmonė, konkursas                     |
+| 4  | Interesų konfliktas — bendri asmenys tarp pirkėjo ir pardavėjo                     | asmuo, įmonė                         |
+| 5  | Sutarčių skaidymas siekiant išvengti ribų                                          | sutartis, konkursas                  |
+| 6  | Geografinė monopolija / vietinis užvaldymas                                        | įmonė, sutartis, pirkėjas            |
+| 7  | Procedūros manipuliavimas / nepagrįstas tiesioginis skyrimas                       | konkursas, sutartis, pirkėjas        |
+| 8  | Kainų anomalijos / permokėjimas / apimties plėtimas                                | sutartis                             |
+| 9  | Atitikties ir juodųjų sąrašų patikrinimas                                          | įmonė, asmuo, byla                   |
+| 10 | Tinklas — antros eilės ryšiai ir korporatyviniai tinklai                           | įmonė, asmuo                         |
+| 11 | UBO rizika — tikrasis savininkas per valdymo struktūrų sluoksnius                  | įmonė, asmuo                         |
+| 12 | ES struktūrinių fondų piktnaudžiavimas / fiktyvūs subrangovai                      | įmonė, sutartis                      |
+| 13 | Besisukančių durų efektas — pirkimų pareigūnas pereina pas laimėjusį tiekėją       | asmuo                                |
+| 14 | Specifikacijų suokalbis — techninės spec. rašomos vienam tiekėjui                  | įmonė, konkursas, pirkėjas           |
+| 15 | Pagrindų sutarties piktnaudžiavimas / vieno tiekėjo atšaukimai                     | įmonė, sutartis, pirkėjas            |
+| 16 | Bendras administracinis aparatas — konkuruojančios įmonės vienu adresu ar domenu   | įmonė                                |
+| 17 | Kainų kartelis — įtartinai vienodos pasiūlymų kainos                               | įmonė, konkursas                     |
+| 18 | Sutarties pakeitimų eskalacija — maža pasiūlymo kaina didinama pakeitimais         | sutartis, pirkėjas                   |
+| 19 | Savivaldybės įmonių favoritizmas — pirkėjas skiria sutartis savo dukterinei įmonei | įmonė, sutartis, pirkėjas            |
+| 20 | Riboto konkurso manipuliavimas — pirkėjas pats pasirenka kviečiamuosius            | konkursas, pirkėjas                  |
+| 21 | Politinių ryšių favoritizmas — įmonės susietos su partijų rėmėjais                 | asmuo, įmonė                         |
+| 22 | Fiktyvūs pristatymų aktai — sutartis pažymėta kaip įvykdyta, bet darbai neatlikti  | sutartis, byla                       |
+| 23 | Tiekėjo įkalinimas / esamo tiekėjo struktūrinė monopolija                          | įmonė, sutartis                      |
+| 24 | ES fondų pažeidimai ir tarpvalstybiniai sukčiavimo modeliai                        | įmonė, sutartis, byla                |
+| 25 | Pinigų plovimo požymiai pirkimų srautuose                                          | įmonė, asmuo, byla                   |
+| 26 | Sisteminiai vidinės kontrolės silpnumai pirkėjuose                                 | pirkėjas                             |
+| 27 | Sektoriui būdingi rizikos požymiai (sveikatos apsauga, statyba, IT)                | įmonė, sutartis, konkursas, pirkėjas |
