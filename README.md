@@ -9,12 +9,15 @@ rekomendacijomis dėl susisiekimo su priežiūros institucijoms kaip STT, FNTT, 
 
 ## Greitas startas
 
-1. Sukurkite Claude paskyrą, eikite į Customize → Connectors → Add custom connector → pridėkite
+1. Sukurkite Claude paskyrą, eikite į Customize → Connectors → Add custom connector → ir pridėkite
    `https://viespirkiai.org/mcp`
-2. Įsigykite Claude Pro planą, įdiekite Claude CLI ir vykdykite `claude` šios saugyklos šakniniame kataloge.
-3. Įveskite `/mcp` ir patikrinkite, ar Viešpirkiai MCP serveris pasiekiamas.
-4. Įveskite `/agents` ir pasirinkite Library → `fraud-procurement-investigation-planner`.
-5. Įrašykite pradinę tyrimo užklausą, pvz.:
+2. Įsigykite Claude Pro planą, įdiekite Claude CLI
+3. [Atsisiųskite šį repozitorių](https://github.com/Viespirkiu-grupe/Tyras/archive/refs/heads/main.zip) arba naudokite
+   Git: `git clone https://github.com/Viespirkiu-grupe/Tyras.git`
+4. Atidarykite terminalą, eikite į šio repozitoriaus šakninį aplanką `Tyras/` ir paleiskite `claude` komandą.
+5. Įveskite `/mcp` ir patikrinkite, ar Viešpirkiai MCP serveris pasiekiamas.
+6. Įveskite `/agents` ir pasirinkite Library → `fraud-procurement-investigation-planner`.
+7. Įrašykite pradinę tyrimo užklausą, pvz.:
 
 ```text
 Ar gali pereiti per pagrindines institucijas, patikrinti IT paslaugų pirkimo konkursus, pasižiūrėti kas laimėjo kiekvieną etapą ir matant didesnę imtį paieškoti sąsajų.
@@ -38,7 +41,8 @@ Inicijuoja tyrimą pagal bylos aprašymą. Išanalizuoja bylą, vieną kartą kl
 asmenų), iš 27 temų bibliotekos parenka aktualias sukčiavimo temas, tada parašo bendrą dossier ir tyrimo planą. Sukuria
 pirmąjį tyrėjo agentą temų grandinei pradėti.
 
-**Paleidimas:** Vartotojas aprašo tyrimo tikslą — pvz. _„Ar gali pereiti per pagrindines institucijas, patikrinti IT paslaugų
+**Paleidimas:** Vartotojas aprašo tyrimo tikslą — pvz. _„Ar gali pereiti per pagrindines institucijas, patikrinti IT
+paslaugų
 pirkimo konkursus..."_
 
 ---
