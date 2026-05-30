@@ -212,13 +212,17 @@ reports; others are candidate feature requests / fixes for the MCP team.
 
 ## Next steps
 
+Please update all related notes and investigation templates with this up-to-date knowledge:
+
 v_dalyviai is hidden due to its limited coverage so it will not be available to MCP and LLM. Also, all tables with that
 start with "atn1" ("atn1ataskaitos", "atn1dalyviai", "atn1pasiulymuEile", " atn1atmestiPasiulymai") are hidden as well,
-because they're not fully populated and may cause confusion.
+because they're not fully populated and may cause confusion. Of cours, do not mention that v_dalyviai is deprecated
+anywhere! Instead, you must rewrite those investigation guides. If additional route is needed, you can check your new
+routes or hypotheses by using MCP.
 
 As an alternative, it is possible to call `get_viesasis_pirkimas`. MCP description is updated as following:
 
-UPDATE: 
+UPDATE:
 
 ```text
 Grąžina išsamią informaciją apie vieną viešąjį pirkimą pagal pirkimo ID. Apima turinį, failus (sieti tik pagal
