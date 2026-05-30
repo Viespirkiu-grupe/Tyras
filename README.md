@@ -126,7 +126,7 @@ Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `inv-YYYY-
 | `plan.md`            | Planuotojas                         | Parinktos temos ir temų užklausų planai                    |
 | `theme-NN-<name>.md` | Tyrėjas (po vieną kiekvienai temai) | Temų išvados ir neapdoroti MCP duomenys                    |
 | `report.md`          | Reporteris                          | Galutinė ataskaita su rekomendacijomis                     |
-| `TOBULINTI.md`       | Visi agentai                        | MCP įrankių klaidos ir duomenų spragos (grįžtamasis ryšys) |
+| `tech-report.md`     | Visi agentai                        | MCP įrankių klaidos ir duomenų spragos (grįžtamasis ryšys) |
 
 ---
 

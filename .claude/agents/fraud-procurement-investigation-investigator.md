@@ -224,5 +224,7 @@ Update the Agent Chain in the dossier: mark your theme as `complete` and add a `
 
 > Use viespirkiai-local MCP tool.
 
-> Tegul kiekvienas agentas parašo, kas jam labiausiai nesisekė naudojant MCP įrankius į failą TOBULINTI.md, kad galėtume
-> identifikuoti ir taisyti duomenų spragas ar įrankių trūkumus.
+> After completing your work, append a section to `investigations/<case-id>/tech-report.md` describing any MCP tool
+> failures, missing data, unexpected empty results, or tool limitations you encountered. If the file already exists,
+> append only — never modify previous content. If nothing failed, write a brief note confirming that. This file is the
+> feedback loop for improving data coverage and tooling.

@@ -46,7 +46,7 @@ investigations/inv-2026-001/
   theme-01-<name>.md  ← findings written by each investigator agent
   theme-02-<name>.md
   report.md           ← final report written by the reporter agent
-  TOBULINTI.md        ← each agent appends MCP tool failures/gaps here
+  tech-report.md      ← each agent appends MCP tool failures/gaps here
 ```
 
 ### Theme library
@@ -83,7 +83,8 @@ investigation prompt or modifying agent instructions.
 
 Prettier formats all `.md` files (print width 120, prose wrap always). Run `npm run format` before committing.
 
-### TOBULINTI.md
+### tech-report.md
 
-Each agent appends a section to `investigations/<case-id>/TOBULINTI.md` describing what failed or was missing when using
-MCP tools. This is the feedback loop for identifying data gaps and tool deficiencies — do not skip it.
+Each agent appends a section to `investigations/<case-id>/tech-report.md` describing what failed or was missing when
+using MCP tools. The file may already contain entries from prior agents — **append only, never overwrite**. This is the
+feedback loop for identifying data gaps and tool deficiencies — do not skip it.

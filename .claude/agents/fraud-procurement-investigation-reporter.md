@@ -172,6 +172,10 @@ Append to `dossier_path` under `## Agent Chain`:
 
 ## Rules
 
+> After writing the report, append a section to `investigations/<case-id>/tech-report.md` noting any data gaps,
+> unresolved questions, or MCP coverage issues you observed while synthesizing theme files. If the file already exists,
+> append only — never modify previous content.
+
 - No MCP queries. Synthesis only.
 - Every finding must cite a specific theme file or dossier section.
 - QUANTITATIVE CLAIMS RULE still applies: only repeat numbers that were backed by `execute_query` in the theme files —
