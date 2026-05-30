@@ -16,6 +16,9 @@ participants.
 - Procedure mix (restricted/negotiated vs. open) by buyer and CPV.
 - `neskelbiamosDerybos` audit findings by buyer.
 - Recurring small circle of invitees (if/when invitation data is available in future).
+- **Single-bidder rate by buyer** — restricted/hand-picked procedures collapse competition, which surfaces as a high
+  single-bidder rate where ATN1 covers the buyer. Compute it via [theme 28](28-single-bidding-competition-intensity.md);
+  this is the measurable corroboration of invitee manipulation when invitation lists themselves are not in the data.
 
 ## SQL Examples
 

@@ -17,7 +17,7 @@ rekomendacijomis dėl susisiekimo su priežiūros institucijoms kaip STT, FNTT, 
    Git: `git clone https://github.com/Viespirkiu-grupe/Tyras.git`
 4. Atidarykite terminalą, eikite į šio repozitoriaus šakninį aplanką `Tyras/` ir paleiskite `claude` komandą.
 5. Įveskite `/mcp` ir patikrinkite, ar [Viešpirkiai MCP serveris](https://viespirkiai.org/mcp) pasiekiamas.
-6. Įveskite `/agents` ir pasirinkite Library → `fraud-procurement-investigation-planner`.
+6. Įveskite `/agents` ir pasirinkite Library → `fraud-investigation-planner`.
 7. Įrašykite pradinę tyrimo užklausą, pvz.:
 
 ```text
@@ -36,10 +36,10 @@ išvadas į struktūrizuotą ataskaitą su rekomendacijomis. `report.md` rasite 
 
 ## Agentų apžvalga
 
-### `fraud-procurement-investigation-planner`
+### `fraud-investigation-planner`
 
 Inicijuoja tyrimą pagal bylos aprašymą. Išanalizuoja bylą, vieną kartą klausinėja MCP visų pavadintų subjektų (įmonių ir
-asmenų), iš 27 temų bibliotekos parenka aktualias sukčiavimo temas, tada parašo bendrą dossier ir tyrimo planą. Sukuria
+asmenų), iš 28 temų bibliotekos parenka aktualias sukčiavimo temas, tada parašo bendrą dossier ir tyrimo planą. Sukuria
 pirmąjį tyrėjo agentą temų grandinei pradėti.
 
 **Paleidimas:** Vartotojas aprašo tyrimo tikslą — pvz. _„Ar gali pereiti per pagrindines institucijas, patikrinti IT
@@ -47,7 +47,7 @@ paslaugų pirkimo konkursus..."_
 
 ---
 
-### `fraud-procurement-investigation-investigator`
+### `procurement-fraud-investigator`
 
 Kiekviena instancija vykdo vieną sukčiavimo temą. Nuskaito bendrą dossier ir visas ankstesnes temų išvadas, tada vykdo
 temai būdingas MCP užklausas (agregacijas, dokumentų paieškas, SQL per pirkimų rodinius). Parašo savo išvadų failą,
@@ -57,7 +57,7 @@ prideda santrauką prie dossier ir sukuria kitą tyrėją arba reporterį, jei t
 
 ---
 
-### `fraud-procurement-investigation-reporter`
+### `fraud-investigation-reporter`
 
 Sintezės agentas MCP užklausų nevykdo. Nuskaito dossier ir visus temų išvadų failus, nustato tarptemines sąsajas ir
 parašo galutinę tyrimo ataskaitą. Apima įrodymų inventorių, subjektų santrauką ir parengtą skyrių su rekomendacijomis
@@ -73,17 +73,17 @@ dėl kontaktavimo su priežiūros institucijoms (STT / FNTT / VPT / VK / KT).
 flowchart TD
     User(["Vartotojas: bylos aprašymas"]) --> Planner
 
-    subgraph Planner["fraud-procurement-investigation-planner"]
+    subgraph Planner["fraud-investigation-planner"]
         P1["Išanalizuoja bylą\n(subjektai, tariami sukčiavimo tipai)"]
         P2["Vieną kartą klausinėja MCP\nvisų pavadintų subjektų"]
-        P3["Parenka temas iš\n27 temų bibliotekos"]
+        P3["Parenka temas iš\n28 temų bibliotekos"]
         P4["Parašo dossier.md\n+ plan.md"]
         P1 --> P2 --> P3 --> P4
     end
 
     Planner -->|" sukuria su 1 temos kontekstu "| Inv1
 
-    subgraph Inv1["fraud-procurement-investigation-investigator (tema 1)"]
+    subgraph Inv1["procurement-fraud-investigator (tema 1)"]
         I1a["Nuskaito dossier + ankstesnes temas"]
         I1b["Nuskaito temos dokumentą\niš docs/themes/"]
         I1c["Vykdo temai būdingas\nMCP užklausas"]
@@ -93,7 +93,7 @@ flowchart TD
 
     Inv1 -->|" sukuria su 2 temos kontekstu "| Inv2
 
-    subgraph Inv2["fraud-procurement-investigation-investigator (tema 2..N)"]
+    subgraph Inv2["procurement-fraud-investigator (tema 2..N)"]
         I2a["Nuskaito dossier + ankstesnes temas"]
         I2b["Nuskaito temos dokumentą"]
         I2c["Vykdo temai būdingas\nMCP užklausas"]
@@ -104,7 +104,7 @@ flowchart TD
     Inv2 -->|" ...tęsiasi kiekvienai temai... "| InvN["tyrėjas (tema N — paskutinė)"]
     InvN -->|" sukuria reporterį "| Reporter
 
-    subgraph Reporter["fraud-procurement-investigation-reporter"]
+    subgraph Reporter["fraud-investigation-reporter"]
         R1["Nuskaito dossier\n+ visus temų failus"]
         R2["Sintezuoja tarptemines\nsąsajas"]
         R3["Parašo report.md\nsu rekomendacijomis"]
@@ -132,7 +132,7 @@ Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `inv-YYYY-
 
 ## Temų biblioteka
 
-27 sukčiavimo aptikimo temos aplanke `docs/themes/`. Rodyklė ir MCP įrankių taisyklės:
+28 sukčiavimo aptikimo temos aplanke `docs/themes/`. Rodyklė ir MCP įrankių taisyklės:
 `docs/index/mcp-investigator-prompt.md`.
 
 | #   | Tema                                                                               | Pagrindiniai subjektai               |
@@ -164,3 +164,4 @@ Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `inv-YYYY-
 | 25  | Pinigų plovimo požymiai pirkimų srautuose                                          | įmonė, asmuo, byla                   |
 | 26  | Sisteminiai vidinės kontrolės silpnumai pirkėjuose                                 | pirkėjas                             |
 | 27  | Sektoriui būdingi rizikos požymiai (sveikatos apsauga, statyba, IT)                | įmonė, sutartis, konkursas, pirkėjas |
+| 28  | Vieno dalyvio pirkimai — pagrindinis konkurencijos intensyvumo rodiklis            | konkursas, pirkėjas, įmonė           |

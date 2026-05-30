@@ -1,5 +1,5 @@
 ---
-name: fraud-procurement-investigation-investigator
+name: procurement-fraud-investigator
 description: >
   Executes one investigation theme for an active procurement fraud case. Reads the shared dossier (entity data gathered
   once by the planner), reads its assigned theme document from ./themes/, runs theme-specific MCP queries, writes its
@@ -184,7 +184,7 @@ Update the Agent Chain table: mark your theme as `complete`.
 
 ### 7a. If `next_theme_index > 0` — spawn the next investigator agent
 
-Read `plan_path` to get the next theme's details. Spawn `fraud-procurement-investigation-investigator` with:
+Read `plan_path` to get the next theme's details. Spawn `procurement-fraud-investigator` with:
 
 ```
 case_id:           <same>
@@ -199,7 +199,7 @@ next_theme_index:  <theme after that, or 0 if last>
 
 ### 7b. If `next_theme_index == 0` — spawn the reporter agent
 
-All themes are done. Spawn `fraud-procurement-investigation-reporter` with:
+All themes are done. Spawn `fraud-investigation-reporter` with:
 
 ```
 case_id:      <same>

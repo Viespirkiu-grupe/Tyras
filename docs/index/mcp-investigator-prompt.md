@@ -40,11 +40,15 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
   `imonesVardas`, `pareigos`, `rysioPradzia`, `rysioPabaiga` (date-filter to avoid stale links), `susijusioAsmensVardas`
   / `susijusioAsmensPavarde` (spouse/family link), `dalyvaujaViesuosePirkimuose` (bool), `registruotaLietuvoje`,
   `yraJuridinisAsmuo`.
-- `v_dalyviai` [themes 2–3, 14, 17]: `atn1ataskaitos` + `atn1dalyviai` + `atn1pasiulymuEile` + `atn1atmestiPasiulymai` +
-  `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`, `salis` (bidder country —
-  cross-border signal), `daliuSkaicius`, `pretenzijaPateikta` (bool), `ieskinysTeismui` (bool). **⚠ Two flag columns are
-  unreliable**: `interesuKonfliktasNustatytas` is never `true` in current data (unpopulated — do not treat absence as
-  "no conflict"); `konkurencijaIskreipiantisAsmuo` is `true` for ~48% of rows and is an administrative declaration,
+- `v_dalyviai` [themes 2–3, 14, 17, 28]: joins `atn1ataskaitos`, `atn1dalyviai`, `atn1pasiulymuEile`,
+  `atn1atmestiPasiulymai` and `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`,
+  `salis` (bidder country — cross-border signal), `daliuSkaicius`, `pretenzijaPateikta` (bool), `ieskinysTeismui`
+  (bool). **The bidder count per procurement** (`COUNT(DISTINCT "tiekejoKodas") GROUP BY "pirkimoNumeris"`) drives the
+  single-bidding indicator (theme 28) — the strongest corruption proxy in the data. **⚠ `eileNumeris` is 100% NULL** in
+  current data (raw table and view) — bid rank / winner is **not recoverable**; any query filtering `eileNumeris = 1`
+  returns nothing (affects themes 2, 17). Single-bidding works around this (sole bidder = winner). **⚠ Two flag columns
+  are unreliable**: `interesuKonfliktasNustatytas` is never `true` in current data (unpopulated — do not treat absence
+  as "no conflict"); `konkurencijaIskreipiantisAsmuo` is `true` for ~48% of rows and is an administrative declaration,
   **not** a fraud signal — do not use it as a red flag without separate validation. **⚠ Coverage**: ~400 reports from
   ~38 buyer organisations only, heavily dominated by one buyer (JAR 135163499, Kauno klinikos, ~62% of reports). Before
   querying `v_dalyviai` for a specific supplier or buyer, verify coverage:
@@ -178,6 +182,7 @@ Each theme is in a separate file under `./themes/`. Load the relevant file(s) be
 | 25  | [25-money-laundering-indicators-around-procurement-flows.md](themes/25-money-laundering-indicators-around-procurement-flows.md)                                     | kompanija, asmuo, byla                   |
 | 26  | [26-systemic-internal-control-weaknesses-in-buyers.md](themes/26-systemic-internal-control-weaknesses-in-buyers.md)                                                 | pirkėjas                                 |
 | 27  | [27-sector-specific-red-flags-healthcare-construction-it.md](themes/27-sector-specific-red-flags-healthcare-construction-it.md)                                     | kompanija, sutartis, konkursas, pirkėjas |
+| 28  | [28-single-bidding-competition-intensity.md](themes/28-single-bidding-competition-intensity.md)                                                                     | konkursas, pirkėjas, kompanija           |
 
 **Subjects** — the entity type that is the primary investigation entry point for a theme:
 

@@ -24,13 +24,12 @@ There is no application code to build or test — the "output" is investigation 
 
 Three specialist agents in `.claude/agents/` run sequentially for every investigation:
 
-1. **`fraud-procurement-investigation-planner`** — parses the case prompt, queries MCP once for all named entities,
-   writes `dossier.md` and `plan.md`, then spawns the first investigator.
-2. **`fraud-procurement-investigation-investigator`** — handles one theme per instance; reads the shared dossier, runs
-   theme-specific MCP queries, writes its findings file, then spawns the next investigator (or the reporter if it is the
-   last theme).
-3. **`fraud-procurement-investigation-reporter`** — synthesis only, no MCP queries; reads all theme files and writes the
-   final `report.md` with supervisory authority referral recommendations.
+1. **`fraud-investigation-planner`** — parses the case prompt, queries MCP once for all named entities, writes
+   `dossier.md` and `plan.md`, then spawns the first investigator.
+2. **`procurement-fraud-investigator`** — handles one theme per instance; reads the shared dossier, runs theme-specific
+   MCP queries, writes its findings file, then spawns the next investigator (or the reporter if it is the last theme).
+3. **`fraud-investigation-reporter`** — synthesis only, no MCP queries; reads all theme files and writes the final
+   `report.md` with supervisory authority referral recommendations.
 
 The planner is triggered by the user. Investigators and the reporter are always spawned by the prior agent, never
 directly.
@@ -51,7 +50,7 @@ investigations/inv-2026-001/
 
 ### Theme library
 
-27 fraud detection themes live in `docs/themes/`. Each theme file describes:
+28 fraud detection themes live in `docs/themes/`. Each theme file describes:
 
 - Fraud pattern and detection logic
 - Specific MCP tools and SQL examples

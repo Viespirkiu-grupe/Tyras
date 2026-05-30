@@ -15,9 +15,14 @@ facts:
   (real column is `darbuotojai`). `v_company`, `v_pirkimas`, and `v_bylos` were all documented with wrong column names
   in the MCP index (fixed in the index; **P2.2** automates prevention of recurrence).
 - **`v_dalyviai` (competition data) coverage:** 7,201 rows, **403 procurements, 38 buyers** — one buyer (JAR 135163499,
-  Kauno klinikos) is **62%** of it. Grounds **P0.1** and **P0.3**.
-- **Single-bidding is computable and high:** of the 403 covered procurements, **102 (25.3%) had a single bidder** — the
-  single strongest empirical corruption proxy in the literature, and no theme computes it. Grounds **P0.1**.
+  Kauno klinikos) is **62%** of it. Grounds **P0.2** and theme 28.
+- **Single-bidding is computable and high:** of the covered procurements, **~26% had a single bidder** (102/397) — the
+  single strongest empirical corruption proxy in the literature. **Now implemented as a first-class indicator in
+  [theme 28](docs/themes/28-single-bidding-competition-intensity.md)** (per buyer / CPV / supplier), cross-referenced
+  from themes 2 and 20.
+- **`v_dalyviai.eileNumeris` is 100% NULL** (raw `atn1pasiulymuEile` and the view) — bid rank / winner is **not
+  recoverable**, so any query filtering `eileNumeris = 1` returns nothing (silently breaks theme 2's win-rate SQL and
+  theme 17 winner logic). Single-bidding sidesteps it (sole bidder = winner). Documented in the MCP-specific section.
 - **`get_schema` exposes join safety** (`strict` / `semantic` / `sparse`) that the themes ignore — e.g.
   `v_dalyviai.tiekejoKodas → v_company` is `sparse`, and `pirkimoNumeris` joins are `semantic`. Naive INNER JOINs on
   these silently drop rows and turn "data exists" into a false "no data." Grounds **P2.1**.
@@ -26,16 +31,7 @@ facts:
 
 ## P0 — Data the system already has but does not use (highest detection upside)
 
-### P0.1 Make single-bidding a first-class indicator
-
-- **What:** A dedicated indicator/theme computing single-bidder rate per buyer, per supplier, and per CPV (from
-  `v_dalyviai` where covered; from notice/award counts where not).
-- **Why:** Single-bidding is the headline corruption-risk indicator in EU procurement research (Fazekas/DIGIWHIST
-  Corruption Risk Index). It is measurable here (25.3% in the covered set) and currently only appears implicitly inside
-  themes 2/20.
-- **Where:** new theme + indicator framework (P1.1). Note the ATN1 coverage limit (P0.3) when bid-level data is absent.
-
-### P0.2 Exploit the richer real columns the themes ignore
+### P0.1 Exploit the richer real columns the themes ignore
 
 - **What:** Use the verified columns now in the index: `faktineIvykdimoVerte`/`faktineIvykdimoData` (cost overruns,
   themes 8/18/22), `v_sutartys` consortia arrays `tiekejaiKodai[]` / `papildomiTiekejai[]` (joint bids / subcontracting,
@@ -47,7 +43,7 @@ facts:
   weaker proxies by hand.
 - **Where:** targeted edits to themes 1, 2, 4, 8, 11, 16, 18, 22, 24; add an "advertisement-period" check to theme 7/20.
 
-### P0.3 State the ATN1 competition-data ceiling prominently per theme
+### P0.2 State the ATN1 competition-data ceiling prominently per theme
 
 - **What:** Themes that depend on bid-level data (2 cover bidding, 3 bid rotation, 17 price cartel, and the competition
   parts of 14) should open with the coverage reality: ~400 reports / 38 buyers / 62% one buyer — so for most entities
@@ -62,7 +58,8 @@ facts:
 
 ### P1.1 Standardised red-flag indicator set with thresholds (a Tyras CRI)
 
-- **What:** A computed indicator library with explicit thresholds — single-bidding, **bid Coefficient of Variation**
+- **What:** A computed indicator library with explicit thresholds — single-bidding (**already built as theme 28 with
+  verified SQL; fold its per-buyer/CPV/supplier queries in as the first indicator**), **bid Coefficient of Variation**
   (theme 17 already uses this per-tender — generalise it), **HHI** market concentration per CPV/buyer, advertisement-
   period length, direct-award/negotiated-procedure share (`v_pirkimas.pirkimoBudas`), repeat buyer–supplier
   concentration, new-company-fast-win (theme 1), and overrun ratio (theme 8) — modelled on the published Corruption Risk
@@ -165,8 +162,12 @@ reports; others are candidate feature requests / fixes for the MCP team.
 
 ### Inherent data limitations (state in reports; not fixable by us)
 
-- **Competition/bid-level analysis is barely covered** (`v_dalyviai`: ~38 buyers). Themes 2, 3, 17 are mostly
+- **Competition/bid-level analysis is barely covered** (`v_dalyviai`: ~38 buyers). Themes 2, 3, 17, 28 are mostly
   inoperative outside a handful of buyers — treat absence as "no data," not "no fraud."
+- **No notice-level "tenders received" count.** Bidder counts exist **only** in `v_dalyviai` (ATN1). `v_pirkimas`,
+  `cvppViesiejiPirkimai`, and `sutartysAtviriDuomenys` record notices/awards but not how many bids each attracted — so
+  single-bidding (theme 28) cannot be computed system-wide, only for the ~38 covered buyers. A notice-level bid-count
+  field would let the strongest corruption proxy run across the whole market (candidate MCP feature request).
 - **No unit-price data** — theme 8's "per-unit price vs national average" is not supported by the schema; only contract
   totals and `faktineIvykdimoVerte` exist. State this rather than implying unit-price benchmarking.
 - **`faktineIvykdimoVerte` is ~12% populated** — overrun themes (8/18/22) must report coverage so a NULL isn't read as
@@ -194,6 +195,10 @@ reports; others are candidate feature requests / fixes for the MCP team.
   absence as "no conflict."
 - **`v_dalyviai.konkurencijaIskreipiantisAsmuo`** is `true` for ~48% of rows and is a boilerplate administrative
   declaration — **not** a fraud signal without separate validation.
+- **`v_dalyviai.eileNumeris` is 100% NULL** (raw `atn1pasiulymuEile` and the view) — bid rank / winner-vs-loser is **not
+  recoverable**. Any query filtering `eileNumeris = 1` returns nothing (silently breaks theme 2's win-rate screen and
+  theme 17 winner logic). Until populated, only the bidder _count_ dimension (single vs. multi, theme 28) is usable; a
+  populated rank column would unlock cover-bidding margin and winning-spread analysis.
 
 ### Query-engine constraints agents repeatedly hit (document in index per P2.3; some are upstream feature requests)
 

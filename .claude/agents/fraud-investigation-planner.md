@@ -1,5 +1,5 @@
 ---
-name: fraud-procurement-investigation-planner
+name: fraud-investigation-planner
 description: >
   Launches a public procurement fraud investigation. Reads the case prompt, queries viespirkiai-local MCP once for all
   named entities using the correct tool sequence, selects relevant themes from mcp-investigator-prompt.md, writes a
@@ -167,7 +167,7 @@ Available themes: 27 total, each in `./themes/<filename>.md`. For each selected 
 
 ### 6. Spawn the first investigator agent
 
-Use the Agent tool to launch `fraud-procurement-investigation-investigator` with this context block:
+Use the Agent tool to launch `procurement-fraud-investigator` with this context block:
 
 ```
 case_id: inv-2026-001

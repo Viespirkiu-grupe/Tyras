@@ -1,5 +1,5 @@
 ---
-name: fraud-procurement-investigation-reporter
+name: fraud-investigation-reporter
 description: >
   Writes the final investigation report for a completed procurement fraud case. Reads the shared dossier and all theme
   findings files, synthesizes evidence across themes, identifies cross-theme patterns, and produces a structured report
