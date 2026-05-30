@@ -25,24 +25,34 @@ first** mapping below:
 
 Prefer views to raw tables. Call `get_schema` to confirm column names.
 
-- `v_company` [themes 1, 5–7, 9–12, 19, 22–23]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `draustieji`,
-  `vidutinisAtlyginimas`, `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimaiFlag`, `bylosKiekis`,
-  `domenaiKiekis`, `neskelbiamosDerybosKiekis`.
+- `v_company` [themes 1, 5–7, 9–12, 19, 22–23]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `darbuotojai`
+  (headcount; = `draustieji` in raw `sodra`), `vidutinisAtlyginimas`, `imokuSuma`, `melagingisTiekejas` (bool),
+  `nepatikimasTiekejas` (bool), `vdiPazeidimuSkaicius` (count, not a flag), `bylosSkaicius`, `domenaiSkaicius`,
+  `neskelbiamosDerybosSkaicius`, `registravimoData`, `statusoPavadinimas`.
 - `v_sutartys` [themes 1–3, 5–8, 13, 15–16, 18–20, 22–24]: `sutartys` + `jarCsv` ×2 → `pirkejas`, `tiekejas`,
-  `pirkejoKodas`, `tiekejoKodas` (names resolved).
-- `v_pirkimas` [themes 5–7, 14, 20, 24]: `viesiejiPirkimai` + `viesiejiPirkimaiVykdytojai` → `vykdytojoPavadinimas`,
-  `savivaldybe`, `shortCode`, `verteEur`.
-- `v_person_links` [themes 4, 10–11, 13, 19, 21]: `pinregJuridiniaiRysiai` + `jarCsv` → `imonesVardas`,
-  `registruotaLietuvoje`, `yraJuridinisAsmuo`.
+  `pirkejoKodas`, `tiekejoKodas` (names resolved), `verte`, `faktineIvykdimoVerte` (actual executed value — populated
+  for ~12% of contracts; enables cost-overrun analysis for themes 8, 18), `faktineIvykdimoData`, `sudarymoData`,
+  `bvpzKodas`, `tipas`, `istrinta`, and consortia arrays `tiekejaiKodai[]` / `papildomiTiekejai[]`.
+- `v_pirkimas` [themes 5–7, 14, 20, 24]: notice-level view → `pirkimoId`, `organizatorius`, `miestas`, `trumpinys`,
+  `pirkimoBudas`, `statusas`, `numatomaVerteEUR`, `esFinansavimas` (bool), `bvpzKodai[]`, `paskelbimoData`,
+  `pasiulymuPateikimoTerminas`.
+- `v_person_links` [themes 4, 10–11, 13, 19, 21]: `pinregJuridiniaiRysiai` + `jarCsv` → `vardas`, `pavarde`, `jarKodas`,
+  `imonesVardas`, `pareigos`, `rysioPradzia`, `rysioPabaiga` (date-filter to avoid stale links), `susijusioAsmensVardas`
+  / `susijusioAsmensPavarde` (spouse/family link), `dalyvaujaViesuosePirkimuose` (bool), `registruotaLietuvoje`,
+  `yraJuridinisAsmuo`.
 - `v_dalyviai` [themes 2–3, 14, 17]: `atn1ataskaitos` + `atn1dalyviai` + `atn1pasiulymuEile` + `atn1atmestiPasiulymai` +
-  `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`. **⚠ Coverage**: ATN1 contains
-  ~443 reports from ~20 buyer organisations only (dominated by Kauno klinikos). Before querying `v_dalyviai` for a
-  specific supplier or buyer, verify coverage:
+  `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`, `salis` (bidder country —
+  cross-border signal), `daliuSkaicius`, `pretenzijaPateikta` (bool), `ieskinysTeismui` (bool). **⚠ Two flag columns are
+  unreliable**: `interesuKonfliktasNustatytas` is never `true` in current data (unpopulated — do not treat absence as
+  "no conflict"); `konkurencijaIskreipiantisAsmuo` is `true` for ~48% of rows and is an administrative declaration,
+  **not** a fraud signal — do not use it as a red flag without separate validation. **⚠ Coverage**: ~400 reports from
+  ~38 buyer organisations only, heavily dominated by one buyer (JAR 135163499, Kauno klinikos, ~62% of reports). Before
+  querying `v_dalyviai` for a specific supplier or buyer, verify coverage:
   `SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'`. If the result is 0,
   competition analysis via this view is **not possible** for that entity — state this explicitly rather than inferring
   absence of competition.
-- `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosRusis`, `teismas`, `bylojeKaip`,
-  `pavadinimas`.
+- `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosNumeris`, `bylosRusis`, `bylosData`,
+  `teismas`, `bylojeKaip`, `dalyvioPavadinimas`, `dalyvioVardasIrPavarde`.
 
 **Raw tables used directly** (no view wrapper exists or view would be counterproductive):
 
