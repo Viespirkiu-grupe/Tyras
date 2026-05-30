@@ -11,7 +11,8 @@ rekomendacijomis dėl susisiekimo su priežiūros institucijoms kaip STT, FNTT, 
 
 1. Sukurkite Claude paskyrą, eikite į Customize → Connectors → Add custom connector → ir pridėkite
    `https://viespirkiai.org/mcp`
-2. Įsigykite [Claude Pro planą](https://claude.com/pricing), įdiekite [Claude Code](https://code.claude.com/docs/en/quickstart)
+2. Įsigykite [Claude Pro planą](https://claude.com/pricing), įdiekite
+   [Claude Code](https://code.claude.com/docs/en/quickstart)
 3. [Atsisiųskite šį repozitorių](https://github.com/Viespirkiu-grupe/Tyras/archive/refs/heads/main.zip) arba naudokite
    Git: `git clone https://github.com/Viespirkiu-grupe/Tyras.git`
 4. Atidarykite terminalą, eikite į šio repozitoriaus šakninį aplanką `Tyras/` ir paleiskite `claude` komandą.
@@ -42,8 +43,7 @@ asmenų), iš 27 temų bibliotekos parenka aktualias sukčiavimo temas, tada par
 pirmąjį tyrėjo agentą temų grandinei pradėti.
 
 **Paleidimas:** Vartotojas aprašo tyrimo tikslą — pvz. _„Ar gali pereiti per pagrindines institucijas, patikrinti IT
-paslaugų
-pirkimo konkursus..."_
+paslaugų pirkimo konkursus..."_
 
 ---
 
@@ -121,7 +121,7 @@ flowchart TD
 Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `inv-YYYY-NNN`):
 
 | Failas               | Parašo                              | Paskirtis                                                  |
-|----------------------|-------------------------------------|------------------------------------------------------------|
+| -------------------- | ----------------------------------- | ---------------------------------------------------------- |
 | `dossier.md`         | Planuotojas                         | Bendri subjektų duomenys; visi agentai nuskaito            |
 | `plan.md`            | Planuotojas                         | Parinktos temos ir temų užklausų planai                    |
 | `theme-NN-<name>.md` | Tyrėjas (po vieną kiekvienai temai) | Temų išvados ir neapdoroti MCP duomenys                    |
@@ -135,32 +135,32 @@ Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `inv-YYYY-
 27 sukčiavimo aptikimo temos aplanke `docs/themes/`. Rodyklė ir MCP įrankių taisyklės:
 `docs/index/mcp-investigator-prompt.md`.
 
-| #  | Tema                                                                               | Pagrindiniai subjektai               |
-|----|------------------------------------------------------------------------------------|--------------------------------------|
-| 1  | Fiktyvios įmonės / pajėgumų neatitikimas                                           | įmonė, sutartis                      |
-| 2  | Pasiūlymų suokalbis / fiktyvūs konkurentai                                         | įmonė, konkursas                     |
-| 3  | Pasiūlymų rotacijos karuselė                                                       | įmonė, konkursas                     |
-| 4  | Interesų konfliktas — bendri asmenys tarp pirkėjo ir pardavėjo                     | asmuo, įmonė                         |
-| 5  | Sutarčių skaidymas siekiant išvengti ribų                                          | sutartis, konkursas                  |
-| 6  | Geografinė monopolija / vietinis užvaldymas                                        | įmonė, sutartis, pirkėjas            |
-| 7  | Procedūros manipuliavimas / nepagrįstas tiesioginis skyrimas                       | konkursas, sutartis, pirkėjas        |
-| 8  | Kainų anomalijos / permokėjimas / apimties plėtimas                                | sutartis                             |
-| 9  | Atitikties ir juodųjų sąrašų patikrinimas                                          | įmonė, asmuo, byla                   |
-| 10 | Tinklas — antros eilės ryšiai ir korporatyviniai tinklai                           | įmonė, asmuo                         |
-| 11 | UBO rizika — tikrasis savininkas per valdymo struktūrų sluoksnius                  | įmonė, asmuo                         |
-| 12 | ES struktūrinių fondų piktnaudžiavimas / fiktyvūs subrangovai                      | įmonė, sutartis                      |
-| 13 | Besisukančių durų efektas — pirkimų pareigūnas pereina pas laimėjusį tiekėją       | asmuo                                |
-| 14 | Specifikacijų suokalbis — techninės spec. rašomos vienam tiekėjui                  | įmonė, konkursas, pirkėjas           |
-| 15 | Pagrindų sutarties piktnaudžiavimas / vieno tiekėjo atšaukimai                     | įmonė, sutartis, pirkėjas            |
-| 16 | Bendras administracinis aparatas — konkuruojančios įmonės vienu adresu ar domenu   | įmonė                                |
-| 17 | Kainų kartelis — įtartinai vienodos pasiūlymų kainos                               | įmonė, konkursas                     |
-| 18 | Sutarties pakeitimų eskalacija — maža pasiūlymo kaina didinama pakeitimais         | sutartis, pirkėjas                   |
-| 19 | Savivaldybės įmonių favoritizmas — pirkėjas skiria sutartis savo dukterinei įmonei | įmonė, sutartis, pirkėjas            |
-| 20 | Riboto konkurso manipuliavimas — pirkėjas pats pasirenka kviečiamuosius            | konkursas, pirkėjas                  |
-| 21 | Politinių ryšių favoritizmas — įmonės susietos su partijų rėmėjais                 | asmuo, įmonė                         |
-| 22 | Fiktyvūs pristatymų aktai — sutartis pažymėta kaip įvykdyta, bet darbai neatlikti  | sutartis, byla                       |
-| 23 | Tiekėjo įkalinimas / esamo tiekėjo struktūrinė monopolija                          | įmonė, sutartis                      |
-| 24 | ES fondų pažeidimai ir tarpvalstybiniai sukčiavimo modeliai                        | įmonė, sutartis, byla                |
-| 25 | Pinigų plovimo požymiai pirkimų srautuose                                          | įmonė, asmuo, byla                   |
-| 26 | Sisteminiai vidinės kontrolės silpnumai pirkėjuose                                 | pirkėjas                             |
-| 27 | Sektoriui būdingi rizikos požymiai (sveikatos apsauga, statyba, IT)                | įmonė, sutartis, konkursas, pirkėjas |
+| #   | Tema                                                                               | Pagrindiniai subjektai               |
+| --- | ---------------------------------------------------------------------------------- | ------------------------------------ |
+| 1   | Fiktyvios įmonės / pajėgumų neatitikimas                                           | įmonė, sutartis                      |
+| 2   | Pasiūlymų suokalbis / fiktyvūs konkurentai                                         | įmonė, konkursas                     |
+| 3   | Pasiūlymų rotacijos karuselė                                                       | įmonė, konkursas                     |
+| 4   | Interesų konfliktas — bendri asmenys tarp pirkėjo ir pardavėjo                     | asmuo, įmonė                         |
+| 5   | Sutarčių skaidymas siekiant išvengti ribų                                          | sutartis, konkursas                  |
+| 6   | Geografinė monopolija / vietinis užvaldymas                                        | įmonė, sutartis, pirkėjas            |
+| 7   | Procedūros manipuliavimas / nepagrįstas tiesioginis skyrimas                       | konkursas, sutartis, pirkėjas        |
+| 8   | Kainų anomalijos / permokėjimas / apimties plėtimas                                | sutartis                             |
+| 9   | Atitikties ir juodųjų sąrašų patikrinimas                                          | įmonė, asmuo, byla                   |
+| 10  | Tinklas — antros eilės ryšiai ir korporatyviniai tinklai                           | įmonė, asmuo                         |
+| 11  | UBO rizika — tikrasis savininkas per valdymo struktūrų sluoksnius                  | įmonė, asmuo                         |
+| 12  | ES struktūrinių fondų piktnaudžiavimas / fiktyvūs subrangovai                      | įmonė, sutartis                      |
+| 13  | Besisukančių durų efektas — pirkimų pareigūnas pereina pas laimėjusį tiekėją       | asmuo                                |
+| 14  | Specifikacijų suokalbis — techninės spec. rašomos vienam tiekėjui                  | įmonė, konkursas, pirkėjas           |
+| 15  | Pagrindų sutarties piktnaudžiavimas / vieno tiekėjo atšaukimai                     | įmonė, sutartis, pirkėjas            |
+| 16  | Bendras administracinis aparatas — konkuruojančios įmonės vienu adresu ar domenu   | įmonė                                |
+| 17  | Kainų kartelis — įtartinai vienodos pasiūlymų kainos                               | įmonė, konkursas                     |
+| 18  | Sutarties pakeitimų eskalacija — maža pasiūlymo kaina didinama pakeitimais         | sutartis, pirkėjas                   |
+| 19  | Savivaldybės įmonių favoritizmas — pirkėjas skiria sutartis savo dukterinei įmonei | įmonė, sutartis, pirkėjas            |
+| 20  | Riboto konkurso manipuliavimas — pirkėjas pats pasirenka kviečiamuosius            | konkursas, pirkėjas                  |
+| 21  | Politinių ryšių favoritizmas — įmonės susietos su partijų rėmėjais                 | asmuo, įmonė                         |
+| 22  | Fiktyvūs pristatymų aktai — sutartis pažymėta kaip įvykdyta, bet darbai neatlikti  | sutartis, byla                       |
+| 23  | Tiekėjo įkalinimas / esamo tiekėjo struktūrinė monopolija                          | įmonė, sutartis                      |
+| 24  | ES fondų pažeidimai ir tarpvalstybiniai sukčiavimo modeliai                        | įmonė, sutartis, byla                |
+| 25  | Pinigų plovimo požymiai pirkimų srautuose                                          | įmonė, asmuo, byla                   |
+| 26  | Sisteminiai vidinės kontrolės silpnumai pirkėjuose                                 | pirkėjas                             |
+| 27  | Sektoriui būdingi rizikos požymiai (sveikatos apsauga, statyba, IT)                | įmonė, sutartis, konkursas, pirkėjas |
