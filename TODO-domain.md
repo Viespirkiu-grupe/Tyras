@@ -209,3 +209,43 @@ reports; others are candidate feature requests / fixes for the MCP team.
 - **Large multi-table joins occasionally fail** with a shared-memory error
   (`could not resize shared memory segment … No space left on device`) — keep joins lean, filter/aggregate early, and
   add `LIMIT`; retry usually succeeds. A larger `work_mem` / temp budget on the server would help the SABIS-scale joins.
+
+## Next steps
+
+v_dalyviai is hidden due to its limited coverage so it will not be available to MCP and LLM. Also, all tables with that
+start with "atn1" ("atn1ataskaitos", "atn1dalyviai", "atn1pasiulymuEile", " atn1atmestiPasiulymai") are hidden as well,
+because they're not fully populated and may cause confusion.
+
+As an alternative, it is possible to call `get_viesasis_pirkimas`. MCP description is updated as following:
+
+UPDATE: 
+
+```text
+Grąžina išsamią informaciją apie vieną viešąjį pirkimą pagal pirkimo ID. Apima turinį, failus (sieti tik pagal
+versijos md5 arba versijos key "id"), vykdytojo duomenis. Gavus failo md5 arba numerinį id — naudok get_failas (ne
+search_failai!). Sumos - eurais. Dalyviai ir pasiūlymų kainos (tik nauja CVP IS, t.y. kai pirkimas turi failus): rask
+ATN-1 xlsx failą (pavadinimas prasideda "PPA-", "ATN-" arba "Atn-1") — tai Pirkimo procedūrų ataskaita. Tada
+get_failas_tekstas(id, puslapis=4, kiekis=4) grąžins: p.4 = dalyviai su kodais, p.6 = atmesti pasiūlymai su kainomis,
+p.7 = pasiūlymų eilė su kainomis, p.10 = sutarties sumos. Seni pirkimai (CVPP) šių failų neturi — dalyvių duomenys ten
+nepasiekiami.;
+```
+
+Additional clarification from the MCP team:
+
+| Source                          | Records | Date range              | Participant data |
+|---------------------------------|---------|-------------------------|------------------|
+| cvppViesiejiPirkimai (old CVPP) | 257,556 | 2017-07-04 → 2024-12-24 | None             |
+| v_pirkimas (new CVP IS)         | 44,466  | 2022-09-24 → today      | ATN-1 xlsx files |
+
+Old CVPP (2017–2024): The table exists and has basic metadata — procurement number, title, buyer, dates, links back to
+cvpp.lt portal — but no participant or bid data. The actual participant data lived in CVPP portal reports (HTML/PDF on
+cvpp.lt), which weren't scraped. So MCP can surface "this procurement existed with this buyer on this date" but nothing
+about who bid or at what price.
+
+New CVP IS (2022–present, overlap with CVPP until end of 2024): Full data via get_viesasis_pirkimas + ATN-1 xlsx files
+for participants/prices.
+
+The description in getViesasisPirkimas.js is accurate. The only thing worth noting: cvppViesiejiPirkimai isn't reachable
+through get_viesasis_pirkimas (that tool queries viesiejiPirkimai, a different table) — it's only queryable via
+execute_query. The LLM can at least answer "did this procurement happen and who organized it" for old CVPP records, just
+not "who bid and at what price."
