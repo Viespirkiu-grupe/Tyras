@@ -62,11 +62,54 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
 - `domenai` — themes 10–11, 16 (domain pair self-join).
 - `cpvaProjektuSutartys` — theme 12 (CPVA subcontractor data).
 - `neskelbiamosDerybos` — theme 20 (audit findings, single-table lookup).
-- other specialized tables (e.g. accounts, invoices) when added — see `get_schema`.
+- SABIS invoice/payment tables — themes 8, 18, 22, 25 (payment-flow analysis): `sabisSutartys` (2.5M),
+  `sabisSutarciuSalys` (4.2M), `sabisSaskaitos` (14.4M invoices), `sabisSaskaituSalys` (32.2M invoice parties). See
+  **SABIS payment-flow analysis** below for the join chain and coverage — these tables do **not** join directly to the
+  registry.
 
 > For human investigator: when adding new raw tables (e.g. new JAR ownership exports, VRK donor data, municipal
 > enterprise registries), extend this list and reference themes where the table is actually used. This keeps the LLM
 > focused on relevant sources and avoids spurious joins.
+
+### SABIS payment-flow analysis (themes 8, 18, 22, 25)
+
+SABIS holds actual **invoice-level money-flow** data — the only source in this schema that shows what was _paid_, as
+opposed to what was _contracted_ (`verte`) or _declared executed_ (`faktineIvykdimoVerte`). It is a self-contained
+4-table model and **does not join directly to the procurement registry**. The direct join
+`sabisSaskaitos."sutartiesUid" = v_sutartys."sutartiesUnikalusId"` returns **zero rows** — the SABIS `sutartiesUid` is a
+16-char internal token (e.g. `tap9HATvC6lOsTZb`), not the numeric registry id. You must bridge through `sabisSutartys`:
+
+```
+v_sutartys."sutartiesUnikalusId" (bigint)
+   = sabisSutartys."vpId"::text            -- bridge: SABIS contract → registry contract (798,740 contracts bridge)
+sabisSutartys."sutartiesUid"
+   = sabisSaskaitos."sutartiesUid"          -- SABIS contract → its invoices
+sabisSaskaitos."sfId"
+   = sabisSaskaituSalys."sfId"              -- invoice → its parties (supplier / buyer / payee), attribute by validusJarKodas
+```
+
+**Coverage (verified against the live DB):** 264,566 registry contracts carry at least one SABIS invoice with an amount
+(3.14M invoice rows, ≈€42B total invoiced). But only ~36% of the 14.4M invoices have `bendraSfSuma` populated and ~36%
+have `sutartiesUid` — so **absence of invoices is not evidence of non-payment**; state coverage when reporting.
+
+**Key columns** — `sabisSaskaitos`: `bendraSfSuma` (gross total), `sumaBePvm` / `sumaPvm`, `israsymoData` (issue date),
+`sfApmokejimoTerminas` (payment due date), `sfTipas` (invoice type), `cpvKodas`. `sabisSaskaituSalys`: `tipas`
+(`Tiekėjas` supplier / `Pirkėjas` buyer / `Pristatymo gavėjas` delivery recipient / `Mokėjimo gavėjas` payment
+recipient), `validusJarKodas`, `validusAsmensKodas` (the only reliable party identifiers — `pavadinimas` here is a hash,
+resolve names via `jarCsv` / `v_company`).
+
+**Mandatory caveats — apply or you will fabricate fraud out of dirty data:**
+
+- **Treat over-invoice ratios as leads, not evidence.** `bendraSfSuma` contains extreme unit/decimal errors (real
+  example: a €7.2M contract with €4.5B of invoices). Always apply a plausibility ceiling, inspect the individual
+  invoices, and never state a raw `invoiced/verte` ratio as a finding without examining the rows behind it.
+- **Filter garbage dates.** `israsymoData` ranges from year `0024` to `5025`. Bound every date query
+  (`WHERE "israsymoData" BETWEEN '2010-01-01' AND CURRENT_DATE`).
+- **Net out credit notes.** `sfTipas = 'Kreditinė sąskaita'` reverses a charge — exclude or subtract it, or totals
+  inflate. `sfTipas = 'Išankstinė sąskaita'` is an advance/prepayment (a red flag in its own right for themes 22/25).
+  ~62% of invoices have a NULL `sfTipas`.
+- **Use the bridge, confirm the count.** This is a multi-hop join across 14M+ rows; always back any total with
+  `execute_query` (QUANTITATIVE CLAIMS RULE) and report it as "SABIS-recorded invoiced value", not "amount paid".
 
 ### Person investigation — standard sequence
 

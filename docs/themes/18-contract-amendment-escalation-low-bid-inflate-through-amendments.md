@@ -16,6 +16,9 @@ original award.
 - `faktineIvykdimoVerte/verte` ratio >1.5 by supplier and buyer.
 - Buyers with highest tolerance for overruns (systemic behaviour).
 - Consistent under-bid pattern by supplier (often cheapest winner) followed by high amendment ratios.
+- **SABIS payment escalation:** suppliers whose SABIS-invoiced total systematically exceeds the contracted `verte`
+  across many contracts, with payments spread over a long window (many invoices, late invoices) — the money-flow
+  signature of inflate-through-amendments, independent of the sparsely-populated `faktineIvykdimoVerte`.
 
 ## SQL Examples
 
@@ -36,8 +39,40 @@ ORDER BY stipriuVirsijimuKiekis DESC
 LIMIT 30;
 ```
 
+```sql
+-- Payment escalation per supplier: SABIS-invoiced total exceeds contracted value across multiple contracts.
+-- Bridge v_sutartys → sabisSutartys.vpId → sabisSaskaitos (see "SABIS payment-flow analysis" in the index).
+-- Per-contract ratio is capped at 10× to drop unit/decimal-error invoices; treat hits as leads, then drill into one
+-- contract's invoice timeline (israsymoData) to confirm a genuine escalation rather than scheduled instalments.
+WITH per_contract AS (SELECT v."tiekejoKodas",
+                             v."tiekejoPavadinimas",
+                             v."sutartiesUnikalusId",
+                             v.verte,
+                             SUM(si."bendraSfSuma") AS invoiced
+                      FROM v_sutartys v
+                               JOIN "sabisSutartys" sc ON sc."vpId" = v."sutartiesUnikalusId"::text
+                               JOIN "sabisSaskaitos" si ON si."sutartiesUid" = sc."sutartiesUid"
+                      WHERE v.verte > 10000
+                        AND si."bendraSfSuma" > 0
+                        AND si."sfTipas" IS DISTINCT FROM 'Kreditinė sąskaita'
+                        AND si."israsymoData" BETWEEN '2010-01-01' AND CURRENT_DATE
+                      GROUP BY v."tiekejoKodas", v."tiekejoPavadinimas", v."sutartiesUnikalusId", v.verte
+                      HAVING SUM(si."bendraSfSuma") <= v.verte * 10)
+SELECT "tiekejoKodas",
+       "tiekejoPavadinimas"                                          AS tiekejas,
+       COUNT(*)                                                      AS sutarciuKiekis,
+       ROUND(AVG(invoiced / NULLIF(verte, 0)), 2)                    AS vidutinisApmoketaSantykis,
+       COUNT(CASE WHEN invoiced > verte * 1.5 THEN 1 END)           AS stipriuVirsijimuKiekis
+FROM per_contract
+GROUP BY "tiekejoKodas", "tiekejoPavadinimas"
+HAVING COUNT(*) >= 5 AND AVG(invoiced / NULLIF(verte, 0)) > 1.3
+ORDER BY stipriuVirsijimuKiekis DESC
+LIMIT 30;
+```
+
 ## Followup
 
 **Gap (data):**
 
-- `dokumentai` JSONB unstructured; CVPIS amendment sequence not fully ingested.
+- `dokumentai` JSONB unstructured; CVPIS amendment sequence not fully ingested — the SABIS query above shows the **net
+  payment** escalation but not the individual amendment documents that authorised each increase.
