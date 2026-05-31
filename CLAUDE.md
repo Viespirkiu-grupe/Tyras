@@ -20,19 +20,33 @@ There is no application code to build or test — the "output" is investigation 
 
 ## Architecture
 
-### Agent chain
+### Agent chain (top-level orchestration)
 
-Three specialist agents in `.claude/agents/` run sequentially for every investigation:
+Three specialist agents in `.claude/agents/` run sequentially for every investigation. **Subagents cannot spawn other
+subagents** — the Agent/Task tool is not available inside a subagent. So the agents do NOT chain into each other; the
+**top-level session (you, the main Claude Code conversation) is the orchestrator** that spawns each agent in turn and
+reads its returned handoff to decide what to spawn next.
 
 1. **`fraud-investigation-planner`** — parses the case prompt, queries MCP once for all named entities, writes
-   `dossier.md` and `plan.md`, then spawns the first investigator.
+   `dossier.md` and `plan.md`, then **returns a handoff** listing the ordered themes (each with its exact theme-document
+   path and output path). It does not spawn anything.
 2. **`procurement-fraud-investigator`** — handles one theme per instance; reads the shared dossier, runs theme-specific
-   MCP queries, writes its findings file, then spawns the next investigator (or the reporter if it is the last theme).
+   MCP queries, writes its findings file, updates the dossier Agent Chain table, then **returns a handoff** stating the
+   next theme index (or `0` = no more themes → reporter is next). It does not spawn anything.
 3. **`fraud-investigation-reporter`** — synthesis only, no MCP queries; reads all theme files and writes the final
-   `report.md` with supervisory authority referral recommendations.
+   `report.md` with supervisory authority referral recommendations. Terminal agent.
 
-The planner is triggered by the user. Investigators and the reporter are always spawned by the prior agent, never
-directly.
+**Orchestration loop (run from the top-level session):**
+
+1. Spawn `fraud-investigation-planner` with the case prompt. When it returns, read `plan.md` for the ordered theme list.
+2. For each theme in order, spawn one `procurement-fraud-investigator` with that theme's inputs (`case_id`,
+   `dossier_path`, `plan_path`, `theme_index`, `theme_name`, `theme_document`, `output_path`, `next_theme_index`). Wait
+   for it to return before spawning the next — they run sequentially because each reads the prior themes' findings.
+3. After the last investigator returns (`next_theme_index == 0`), spawn `fraud-investigation-reporter` to write
+   `report.md`.
+
+The planner run is triggered by the user; the investigators and reporter are spawned by the top-level orchestrator, not
+by each other.
 
 ### Investigation workspace
 
