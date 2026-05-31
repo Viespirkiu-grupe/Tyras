@@ -14,6 +14,8 @@ first** mapping below:
 - Find companies by name or code → `search_juridiniai`
 - Find persons, emails, phones, IBANs in uploaded documents → `search_failai`
 - Find procurement notices → `search_viesieji_pirkimai`
+- Inspect who bid and at what price on a **specific** procurement → `get_viesasis_pirkimas` then `get_failas_tekstas` on
+  its ATN-1 file (see **Participant & bid data** below) — there is no SQL table for bidders/bid prices
 - Aggregate, count, compute ratios, join tables → `execute_query`
 
 > **QUANTITATIVE CLAIMS RULE**: Any statement about totals, counts, value sums, market share, or trends **MUST** be
@@ -25,24 +27,23 @@ first** mapping below:
 
 Prefer views to raw tables. Call `get_schema` to confirm column names.
 
-- `v_company` [themes 1, 5–7, 9–12, 19, 22–23]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `draustieji`,
-  `vidutinisAtlyginimas`, `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimaiFlag`, `bylosKiekis`,
-  `domenaiKiekis`, `neskelbiamosDerybosKiekis`.
+- `v_company` [themes 1, 5–7, 9–12, 19, 22–23]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `darbuotojai`
+  (headcount; = `draustieji` in raw `sodra`), `vidutinisAtlyginimas`, `imokuSuma`, `melagingisTiekejas` (bool),
+  `nepatikimasTiekejas` (bool), `vdiPazeidimuSkaicius` (count, not a flag), `bylosSkaicius`, `domenaiSkaicius`,
+  `neskelbiamosDerybosSkaicius`, `registravimoData`, `statusoPavadinimas`.
 - `v_sutartys` [themes 1–3, 5–8, 13, 15–16, 18–20, 22–24]: `sutartys` + `jarCsv` ×2 → `pirkejas`, `tiekejas`,
-  `pirkejoKodas`, `tiekejoKodas` (names resolved).
-- `v_pirkimas` [themes 5–7, 14, 20, 24]: `viesiejiPirkimai` + `viesiejiPirkimaiVykdytojai` → `vykdytojoPavadinimas`,
-  `savivaldybe`, `shortCode`, `verteEur`.
-- `v_person_links` [themes 4, 10–11, 13, 19, 21]: `pinregJuridiniaiRysiai` + `jarCsv` → `imonesVardas`,
-  `registruotaLietuvoje`, `yraJuridinisAsmuo`.
-- `v_dalyviai` [themes 2–3, 14, 17]: `atn1ataskaitos` + `atn1dalyviai` + `atn1pasiulymuEile` + `atn1atmestiPasiulymai` +
-  `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`. **⚠ Coverage**: ATN1 contains
-  ~443 reports from ~20 buyer organisations only (dominated by Kauno klinikos). Before querying `v_dalyviai` for a
-  specific supplier or buyer, verify coverage:
-  `SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'`. If the result is 0,
-  competition analysis via this view is **not possible** for that entity — state this explicitly rather than inferring
-  absence of competition.
-- `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosRusis`, `teismas`, `bylojeKaip`,
-  `pavadinimas`.
+  `pirkejoKodas`, `tiekejoKodas` (names resolved), `verte`, `faktineIvykdimoVerte` (actual executed value — populated
+  for ~12% of contracts; enables cost-overrun analysis for themes 8, 18), `faktineIvykdimoData`, `sudarymoData`,
+  `bvpzKodas`, `tipas`, `istrinta`, and consortia arrays `tiekejaiKodai[]` / `papildomiTiekejai[]`.
+- `v_pirkimas` [themes 5–7, 14, 20, 24]: notice-level view → `pirkimoId`, `organizatorius`, `miestas`, `trumpinys`,
+  `pirkimoBudas`, `statusas`, `numatomaVerteEUR`, `esFinansavimas` (bool), `bvpzKodai[]`, `paskelbimoData`,
+  `pasiulymuPateikimoTerminas`.
+- `v_person_links` [themes 4, 10–11, 13, 19, 21]: `pinregJuridiniaiRysiai` + `jarCsv` → `vardas`, `pavarde`, `jarKodas`,
+  `imonesVardas`, `pareigos`, `rysioPradzia`, `rysioPabaiga` (date-filter to avoid stale links), `susijusioAsmensVardas`
+  / `susijusioAsmensPavarde` (spouse/family link), `dalyvaujaViesuosePirkimuose` (bool), `registruotaLietuvoje`,
+  `yraJuridinisAsmuo`.
+- `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosNumeris`, `bylosRusis`, `bylosData`,
+  `teismas`, `bylojeKaip`, `dalyvioPavadinimas`, `dalyvioVardasIrPavarde`.
 
 **Raw tables used directly** (no view wrapper exists or view would be counterproductive):
 
@@ -52,11 +53,91 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
 - `domenai` — themes 10–11, 16 (domain pair self-join).
 - `cpvaProjektuSutartys` — theme 12 (CPVA subcontractor data).
 - `neskelbiamosDerybos` — theme 20 (audit findings, single-table lookup).
-- other specialized tables (e.g. accounts, invoices) when added — see `get_schema`.
+- SABIS invoice/payment tables — themes 8, 18, 22, 25 (payment-flow analysis): `sabisSutartys` (2.5M),
+  `sabisSutarciuSalys` (4.2M), `sabisSaskaitos` (14.4M invoices), `sabisSaskaituSalys` (32.2M invoice parties). See
+  **SABIS payment-flow analysis** below for the join chain and coverage — these tables do **not** join directly to the
+  registry.
 
 > For human investigator: when adding new raw tables (e.g. new JAR ownership exports, VRK donor data, municipal
 > enterprise registries), extend this list and reference themes where the table is actually used. This keeps the LLM
 > focused on relevant sources and avoids spurious joins.
+
+### Participant & bid data — who bid and at what price (themes 2, 3, 14, 16, 17, 27, 28)
+
+Bidder lists and bid prices are **not** in any queryable table or view. They live inside the official **ATN-1 "Pirkimo
+procedūrų ataskaita"** XLSX attached to each procurement, and are read **one procurement at a time** — there is no SQL
+aggregate of bidder counts or bid prices:
+
+1. `get_viesasis_pirkimas(pirkimoId)` → returns the procurement's `failai` list (plus content and buyer data).
+2. In that list find the ATN-1 report — filename begins **`PPA-`**, **`ATN-`**, or **`Atn-1`**, extension `xlsx`. Take
+   its numeric `id`.
+3. `get_failas_tekstas(id, puslapis=4, kiekis=4)` → the bid-evaluation pages of the standard report:
+   - **p.4 — `VI. DALYVIAI (KANDIDATAI)`:** every bidder, with JAR code + country. **Counting these rows is the bidder
+     count** → single-bidding detection (theme 28); one bidder row = single bidder.
+   - **p.6 — `VII.2`:** non-submitting / withdrawn / rejected bids, with rejection grounds and prices.
+   - **p.7 — `VII.3` pasiūlymų eilė:** the ranked bid list — part no., **rank (eilės numeris)**, bidder code, **bid
+     price** (feeds cover-bidding margins, theme 2; within-tender price variation, theme 17).
+   - **p.10 — `XI. SUTARTYS`:** awarded contract value(s).
+
+**Caveats (apply every time):**
+
+- The page numbers above hold for the **standard single-part report (~11 pages)**. Large multi-part reports (80–130
+  pages) push these sections to later pages — there, pull a wider page range (`kiekis` up to 25) and locate the
+  `VI. DALYVIAI` / `VII.3` section headers in the returned text rather than trusting fixed page numbers.
+- Only **new CVP IS** procurements (≈2022→today) carry these files. **Old CVPP** procurements (2017→2024) have no
+  participant/bid data at all — `get_viesasis_pirkimas` cannot return it, and `cvppViesiejiPirkimai` is reachable only
+  via `execute_query` for metadata (who organised it, what, when), never for who-bid-what.
+- The route is **per-procurement and qualitative**. To work at scale, screen first with structural proxies — procedure
+  mix in `v_pirkimas.pirkimoBudas`, repeat buyer→supplier concentration in `v_sutartys`, `neskelbiamosDerybos` — to pick
+  a short list of candidate procurements, **then** open their ATN-1 files. Never state a market-wide bidder-count
+  statistic; report per-procurement observations.
+
+**Coverage (CVP IS vs CVPP):**
+
+| Source                                         | Records | Date range        | Participant / bid data |
+| ---------------------------------------------- | ------- | ----------------- | ---------------------- |
+| `cvppViesiejiPirkimai` (old CVPP)              | 257,556 | 2017-07 → 2024-12 | none                   |
+| `v_pirkimas` / `viesiejiPirkimai` (new CVP IS) | 44,466  | 2022-09 → today   | ATN-1 XLSX             |
+
+### SABIS payment-flow analysis (themes 8, 18, 22, 25)
+
+SABIS holds actual **invoice-level money-flow** data — the only source in this schema that shows what was _paid_, as
+opposed to what was _contracted_ (`verte`) or _declared executed_ (`faktineIvykdimoVerte`). It is a self-contained
+4-table model and **does not join directly to the procurement registry**. The direct join
+`sabisSaskaitos."sutartiesUid" = v_sutartys."sutartiesUnikalusId"` returns **zero rows** — the SABIS `sutartiesUid` is a
+16-char internal token (e.g. `tap9HATvC6lOsTZb`), not the numeric registry id. You must bridge through `sabisSutartys`:
+
+```
+v_sutartys."sutartiesUnikalusId" (bigint)
+   = sabisSutartys."vpId"::text            -- bridge: SABIS contract → registry contract (798,740 contracts bridge)
+sabisSutartys."sutartiesUid"
+   = sabisSaskaitos."sutartiesUid"          -- SABIS contract → its invoices
+sabisSaskaitos."sfId"
+   = sabisSaskaituSalys."sfId"              -- invoice → its parties (supplier / buyer / payee), attribute by validusJarKodas
+```
+
+**Coverage (verified against the live DB):** 264,566 registry contracts carry at least one SABIS invoice with an amount
+(3.14M invoice rows, ≈€42B total invoiced). But only ~36% of the 14.4M invoices have `bendraSfSuma` populated and ~36%
+have `sutartiesUid` — so **absence of invoices is not evidence of non-payment**; state coverage when reporting.
+
+**Key columns** — `sabisSaskaitos`: `bendraSfSuma` (gross total), `sumaBePvm` / `sumaPvm`, `israsymoData` (issue date),
+`sfApmokejimoTerminas` (payment due date), `sfTipas` (invoice type), `cpvKodas`. `sabisSaskaituSalys`: `tipas`
+(`Tiekėjas` supplier / `Pirkėjas` buyer / `Pristatymo gavėjas` delivery recipient / `Mokėjimo gavėjas` payment
+recipient), `validusJarKodas`, `validusAsmensKodas` (the only reliable party identifiers — `pavadinimas` here is a hash,
+resolve names via `jarCsv` / `v_company`).
+
+**Mandatory caveats — apply or you will fabricate fraud out of dirty data:**
+
+- **Treat over-invoice ratios as leads, not evidence.** `bendraSfSuma` contains extreme unit/decimal errors (real
+  example: a €7.2M contract with €4.5B of invoices). Always apply a plausibility ceiling, inspect the individual
+  invoices, and never state a raw `invoiced/verte` ratio as a finding without examining the rows behind it.
+- **Filter garbage dates.** `israsymoData` ranges from year `0024` to `5025`. Bound every date query
+  (`WHERE "israsymoData" BETWEEN '2010-01-01' AND CURRENT_DATE`).
+- **Net out credit notes.** `sfTipas = 'Kreditinė sąskaita'` reverses a charge — exclude or subtract it, or totals
+  inflate. `sfTipas = 'Išankstinė sąskaita'` is an advance/prepayment (a red flag in its own right for themes 22/25).
+  ~62% of invoices have a NULL `sfTipas`.
+- **Use the bridge, confirm the count.** This is a multi-hop join across 14M+ rows; always back any total with
+  `execute_query` (QUANTITATIVE CLAIMS RULE) and report it as "SABIS-recorded invoiced value", not "amount paid".
 
 ### Person investigation — standard sequence
 
@@ -125,6 +206,7 @@ Each theme is in a separate file under `./themes/`. Load the relevant file(s) be
 | 25  | [25-money-laundering-indicators-around-procurement-flows.md](themes/25-money-laundering-indicators-around-procurement-flows.md)                                     | kompanija, asmuo, byla                   |
 | 26  | [26-systemic-internal-control-weaknesses-in-buyers.md](themes/26-systemic-internal-control-weaknesses-in-buyers.md)                                                 | pirkėjas                                 |
 | 27  | [27-sector-specific-red-flags-healthcare-construction-it.md](themes/27-sector-specific-red-flags-healthcare-construction-it.md)                                     | kompanija, sutartis, konkursas, pirkėjas |
+| 28  | [28-single-bidding-competition-intensity.md](themes/28-single-bidding-competition-intensity.md)                                                                     | konkursas, pirkėjas, kompanija           |
 
 **Subjects** — the entity type that is the primary investigation entry point for a theme:
 

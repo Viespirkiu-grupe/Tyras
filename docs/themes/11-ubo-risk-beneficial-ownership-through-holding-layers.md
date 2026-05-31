@@ -25,28 +25,28 @@ at first glance.
 ## SQL Examples
 
 ```sql
--- Persons declared in PINREG for two companies that bid in the same tender (UBO co-control)
-SELECT d1."ataskaitaId" AS pirkimasId,
-       a."pirkimoNumeris",
-       d1.kodas         AS kodas1,
-       j1.pavadinimas   AS pavadinimas1,
-       d2.kodas         AS kodas2,
-       j2.pavadinimas   AS pavadinimas2,
-       pr.vardas,
-       pr.pavarde
-FROM "atn1dalyviai" d1
-         JOIN "atn1dalyviai" d2
-              ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas > d1.kodas
-         JOIN "atn1ataskaitos" a ON a.id = d1."ataskaitaId"
-         JOIN "pinregJuridiniaiRysiai" pr ON pr."jarKodas" = d1.kodas
+-- Company pairs that share a declared person in PINREG (same vardas+pavarde) — candidate co-controlled bidders.
+-- Co-bidding is then confirmed per procurement from the ATN-1 bidder list (see note below); it is not queryable.
+SELECT pr1."jarKodas" AS kodas1,
+       j1.pavadinimas AS pavadinimas1,
+       pr2."jarKodas" AS kodas2,
+       j2.pavadinimas AS pavadinimas2,
+       pr1.vardas,
+       pr1.pavarde
+FROM "pinregJuridiniaiRysiai" pr1
          JOIN "pinregJuridiniaiRysiai" pr2
-              ON pr2."jarKodas" = d2.kodas AND pr2.vardas = pr.vardas AND pr2.pavarde = pr.pavarde
-         JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1.kodas
-JOIN "jarCsv" j2
-ON j2."jarKodas":: text = d2.kodas
-ORDER BY a."pirkimoNumeris"
+              ON pr2.vardas = pr1.vardas AND pr2.pavarde = pr1.pavarde AND pr2."jarKodas" > pr1."jarKodas"
+         JOIN "jarCsv" j1 ON j1."jarKodas"::text = pr1."jarKodas"
+         JOIN "jarCsv" j2 ON j2."jarKodas"::text = pr2."jarKodas"
+ORDER BY pr1.pavarde, pr1.vardas
 LIMIT 50;
 ```
+
+> **Confirm co-bidding per procurement.** A shared person only flags _potential_ co-control. To show the two companies
+> actually competed in the same tender, find procurements both supplied (`search_sutartys` / `v_sutartys`) and read the
+> overlapping procurements' ATN-1 bidder lists — `get_viesasis_pirkimas` → `get_failas_tekstas(<fileId>, puslapis=4)` →
+> both codes present in `VI. DALYVIAI`. Also filter homonyms: a shared common name is weak; corroborate with PINREG
+> identifiers, shared address (`jarCsv`), or shared domain (`domenai`).
 
 ```sql
 -- PINREG links to foreign-registered or legal-entity holders (high UBO risk indicators)

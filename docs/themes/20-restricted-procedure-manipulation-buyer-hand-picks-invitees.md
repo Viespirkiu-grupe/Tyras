@@ -16,6 +16,10 @@ participants.
 - Procedure mix (restricted/negotiated vs. open) by buyer and CPV.
 - `neskelbiamosDerybos` audit findings by buyer.
 - Recurring small circle of invitees (if/when invitation data is available in future).
+- **Single-bidding on the buyer's procurements** — restricted/hand-picked procedures collapse competition, which
+  surfaces as single-bidder tenders. Confirm it per procurement via
+  [theme 28](28-single-bidding-competition-intensity.md) (count `VI. DALYVIAI` in each ATN-1 report); this is the
+  measurable corroboration of invitee manipulation when invitation lists themselves are not in the data.
 
 ## SQL Examples
 
@@ -37,4 +41,5 @@ LIMIT 30;
 
 **Gap (data):**
 
-- `atn1dalyviai` records submitted bids only, not invitees — cannot detect excluded qualified suppliers yet.
+- The ATN-1 report records **submitted bids only, not invitees** — excluded qualified suppliers cannot be detected;
+  invitation lists are not in the data.

@@ -5,57 +5,47 @@
 A price cartel is indicated when independent competing bidders in the same tender submit prices that are suspiciously
 uniform, suggesting prior coordination on bid levels rather than independently determined competitive offers.
 
-- **Tools:** `execute_query`
-- **Goal:** Detect tenders with abnormally low price variation among independent bidders — a primary cartel signal. Also
-  screen CPV categories nationally for uniformity as a secondary filter to identify categories warranting deeper
-  per-tender analysis.
+- **Tools:** `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `get_failas_tekstas`, `execute_query` (structural
+  screening)
+- **Goal:** Detect tenders with abnormally low price variation among independent bidders — a primary cartel signal.
 - **Supervisory authorities:** KT, STT
 - **OSINT sources:** sector cost structures
 
 ## To Detect
 
-> **Methodology note**: The correct unit of analysis for price cartel detection is the **individual tender** (comparing
-> bids submitted by different suppliers within the same procurement). Computing CV across all tenders in a CPV group
-> nationally conflates different buyers, specifications, years, and scales — the resulting CV tells you almost nothing
-> about cartel behaviour. Use the per-tender query (first SQL below) as the primary detection method. The cross-tender
-> national-average query (second SQL) is a coarse screening tool only; low national CV in commodity categories may be
-> entirely normal.
+> **Methodology note**: The correct unit of analysis is the **individual tender** — comparing the bids different
+> suppliers submitted within the same procurement. Those bids are not in any table; they are read from each
+> procurement's ATN-1 report (`get_viesasis_pirkimas` → `get_failas_tekstas`, **p.7 `VII.3` pasiūlymų eilė** = ranked
+> bids with prices; **p.6 `VII.2`** = rejected bids with prices). So CV is computed **per tender, by hand, from the
+> file**, not by SQL. Only **new CVP IS** procurements (≈2022→today) carry these files. Use SQL only to **shortlist**
+> which tenders to open (multi-supplier CPV categories, repeat-bidder clusters); never compute a cross-tender national
+> CV as a finding — it conflates buyers, specs, years, and scales and says nothing about cartel behaviour.
 
-- Coefficient of variation of bid prices **within individual tenders** (CV < 5% with ≥ 3 bidders is a strong signal).
-- Repeat suppliers in tenders with suspiciously uniform prices.
-- Clustering of low-variation tenders in certain buyers or regions.
+- Coefficient of variation of bid prices **within an individual tender** (CV < 5% with ≥ 3 bidders is a strong signal) —
+  computed from that tender's `VII.3` bid list.
+- The same suppliers recurring across tenders that show suspiciously uniform prices.
+- Clustering of such low-variation tenders in certain buyers or regions.
 
-## SQL Examples
-
-```sql
--- PRIMARY: Per-tender CV of bid prices — low within-tender variation among ≥3 bidders is a cartel signal
-SELECT e."ataskaitaId" AS pirkimasId,
-       a."pirkimoNumeris", LEFT (vp."bvpzKodai"[1], 3) AS cpvGrupe, COUNT(e.id) AS pasiulymuKiekis, ROUND(AVG(e.kaina:: numeric), 0) AS vidutineKaina, ROUND(MIN(e.kaina:: numeric), 0) AS minKaina, ROUND(MAX(e.kaina:: numeric), 0) AS maxKaina, ROUND(STDDEV(e.kaina:: numeric) / NULLIF(AVG(e.kaina:: numeric), 0) * 100, 1) AS variacijosKoefProc
-FROM "atn1pasiulymuEile" e
-    JOIN "atn1ataskaitos" a
-ON a.id = e."ataskaitaId"
-    JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = a."pirkimoNumeris"
-WHERE e.kaina ~ '^\d+(\.\d+)?$' AND vp."bvpzKodai" IS NOT NULL
-GROUP BY e."ataskaitaId", a."pirkimoNumeris", LEFT (vp."bvpzKodai"[1], 3)
-HAVING COUNT(e.id) >= 3
-   AND STDDEV(e.kaina:: numeric) / NULLIF(AVG(e.kaina:: numeric)
-     , 0) * 100
-     < 5
-ORDER BY variacijosKoefProc ASC
-LIMIT 50;
-```
+## Method — shortlist with SQL, compute CV from the ATN-1 file
 
 ```sql
--- SECONDARY SCREENING ONLY: Cross-tender CV by CPV group nationally (commodity-like categories
--- may show naturally low CV — always investigate individual tenders before drawing conclusions)
-SELECT LEFT (vp."bvpzKodai"[1], 3) AS cpvGrupe, COUNT(DISTINCT e."ataskaitaId") AS pirkimuKiekis, COUNT(e.id) AS pasiulymuKiekis, ROUND(AVG(e.kaina:: numeric), 0) AS vidutineKaina, ROUND(STDDEV(e.kaina:: numeric) / NULLIF(AVG(e.kaina:: numeric), 0) * 100, 1) AS variacijosKoefProc
-FROM "atn1pasiulymuEile" e
-    JOIN "atn1ataskaitos" a
-ON a.id = e."ataskaitaId"
-    JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = a."pirkimoNumeris"
-WHERE e.kaina ~ '^\d+(\.\d+)?$' AND vp."bvpzKodai" IS NOT NULL
-GROUP BY LEFT (vp."bvpzKodai"[1], 3)
-HAVING COUNT(DISTINCT e."ataskaitaId") >= 10 AND AVG(e.kaina:: numeric) > 0
-ORDER BY variacijosKoefProc ASC
-LIMIT 30;
+-- Stage 1: CPV groups + buyers with several competing suppliers (where ≥3-bidder tenders to inspect exist).
+-- This finds WHERE to look; it does not measure bid uniformity (bids are not in any table).
+SELECT LEFT(s."bvpzKodas", 3)               AS cpvGrupe,
+       s."pirkejoKodas",
+       MAX(s.pirkejas)                      AS pirkejas,
+       COUNT(DISTINCT s."tiekejoKodas")     AS skirtinguTiekeju,
+       COUNT(*)                             AS sutarciuKiekis
+FROM v_sutartys s
+WHERE s.istrinta IS NOT TRUE AND s."bvpzKodas" IS NOT NULL
+GROUP BY LEFT(s."bvpzKodas", 3), s."pirkejoKodas"
+HAVING COUNT(DISTINCT s."tiekejoKodas") >= 3
+ORDER BY sutarciuKiekis DESC
+LIMIT 40;
 ```
+
+**Stage 2 (per shortlisted procurement):** `get_viesasis_pirkimas(pirkimoId)` → open the ATN-1 file →
+`get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)`. From **p.7 (`VII.3`)** list every bidder's price; if there are ≥3
+independent bidders and the spread is tiny (CV < ~5%, prices clustered within a fraction of a percent, or suspiciously
+round/sequential), record it as a cartel signal. Note repeat suppliers across such tenders. Report the procurement ID,
+bidder codes, and the exact prices — these are the evidence for a KT referral.

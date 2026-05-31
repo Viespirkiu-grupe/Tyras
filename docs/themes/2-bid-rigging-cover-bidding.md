@@ -6,62 +6,58 @@ Cover bidding occurs when competitors submit intentionally non-competitive bids 
 competition while ensuring a pre-arranged winner succeeds. Recurring losers consistently bid just above the winner, with
 patterns suggesting coordination rather than genuine independent pricing.
 
-- **Tools:** `search_sutartys`, `execute_query`
+- **Tools:** `search_sutartys`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `get_failas_tekstas`,
+  `execute_query`
 - **Goal:** Detect cover bidding — recurring losers always bidding just above winner.
 - **Supervisory authorities:** STT, KT
 - **OSINT sources:** industry associations, local media
 
 ## To Detect
 
-> **Note**: **Bid suppression** (potential bidders deliberately abstaining from a tender) cannot be detected from
-> available data. `atn1dalyviai` records only submitted bids, not invited parties. Do not claim bid suppression
-> detection; defer to Theme 20 for partial insight via invitation data gaps. **Coverage warning**: `v_dalyviai` covers
-> only ~20 buyer organisations that submitted ATN1 reports (~443 reports total). If a supplier's buyers are not among
-> them, `v_dalyviai` will return 0 rows — this means **no data**, not no competition. Always verify coverage before
-> drawing conclusions.
+> **Note — bid prices are read per procurement, not queried.** Cover bidding needs the actual bids submitted on a
+> tender, and those live only in each procurement's ATN-1 report, read via `get_viesasis_pirkimas` →
+> `get_failas_tekstas` (see **Participant & bid data** in the MCP index). **p.7 (`VII.3` pasiūlymų eilė)** gives the
+> ranked bid list with **rank, bidder code, and price**; **p.6 (`VII.2`)** gives rejected/withdrawn bids. There is no
+> SQL aggregate of bids or co-bidder pairs across the market — co-bidding patterns are assembled by reading several
+> procurements' files. Only **new CVP IS** procurements (≈2022→today) have these files; **old CVPP** procurements have
+> no bid data (do not read absence as competition). **Bid suppression** (invited parties abstaining) still cannot be
+> detected — the report records submitted bids, not invitees; defer to theme 20. Before cover-bid analysis, screen with
+> **single-bidding — see [theme 28](28-single-bidding-competition-intensity.md)**: a tender that collapsed to one bidder
+> is the limiting case of suppressed competition.
 
-- Win rate vs. participation count per supplier per CPV category (use as initial screening only — low win rate alone
-  does not confirm cover bidding; legitimate SMEs may participate in many tenders without winning).
-- Top co-bidder frequency (same losing bidders repeatedly present when a given winner participates).
-- Losing bid clustering above winning price (small margins, consistent structure).
-- Participation count vs. CPV national average (few bidders where market structure suggests more).
-- Persistent patterns where one supplier often wins, others rarely win except where the main supplier does not bid.
+- Losing bid clustering just above the winning price (small, consistent margins) — read from `VII.3` on the ATN-1 file.
+- Top co-bidder frequency (same losing bidders repeatedly present when a given winner wins) — assembled across several
+  procurements' bidder lists (`VI. DALYVIAI`).
+- Win rate vs. participation per supplier (low win rate with high frequency = possible designated loser) — screen
+  candidates structurally (below), then confirm wins/losses from the ranked bid lists.
+- Few bidders where market structure suggests more — single-bidding (theme 28) as the extreme case.
+- Persistent patterns where one supplier wins and others rarely win except when that supplier does not bid.
 
-## SQL Examples
+## Method — screen with SQL, confirm in the ATN-1 files
 
-```sql
--- Win rate vs. participation count per supplier — preliminary screening; very low win rate with high frequency warrants further co-bidder analysis
-SELECT d.kodas                                                                AS "tiekejoKodas",
-       j.pavadinimas                                                          AS tiekejas,
-       COUNT(DISTINCT d."ataskaitaId")                                        AS dalyvutaPirkimuose,
-       COUNT(DISTINCT CASE WHEN e."eileNumeris" = 1 THEN d."ataskaitaId" END) AS laimetaPirkimuose,
-       ROUND(100.0 * COUNT(DISTINCT CASE WHEN e."eileNumeris" = 1 THEN d."ataskaitaId" END)
-                 / COUNT(DISTINCT d."ataskaitaId"), 1)                        AS laimedamuProc
-FROM "atn1dalyviai" d
-         JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas
-LEFT JOIN "atn1pasiulymuEile" e
-ON e."ataskaitaId" = d."ataskaitaId" AND e."dalyvioKodas" = d.kodas
-WHERE d.kodas IS NOT NULL AND d.kodas <> ''
-GROUP BY d.kodas, j.pavadinimas
-HAVING COUNT(DISTINCT d."ataskaitaId") >= 10
-ORDER BY laimedamuProc ASC, dalyvutaPirkimuose DESC
-LIMIT 50;
-```
+There is no bid-level table to query. Use `v_sutartys` to find repeat buyer→supplier/co-supplier clusters worth
+inspecting, then open the candidate procurements' ATN-1 reports to examine the actual bids.
 
 ```sql
--- Most frequent co-bidder pairs (same two companies appearing together repeatedly)
-SELECT d1.kodas                         AS kodas1,
-       j1.pavadinimas                   AS pavadinimas1,
-       d2.kodas                         AS kodas2,
-       j2.pavadinimas                   AS pavadinimas2,
-       COUNT(DISTINCT d1."ataskaitaId") AS buvoPoroje
-FROM "atn1dalyviai" d1
-         JOIN "atn1dalyviai" d2 ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas > d1.kodas
-         JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1.kodas
-JOIN "jarCsv" j2
-ON j2."jarKodas":: text = d2.kodas
-GROUP BY d1.kodas, j1.pavadinimas, d2.kodas, j2.pavadinimas
-HAVING COUNT(DISTINCT d1."ataskaitaId") >= 15
-ORDER BY buvoPoroje DESC
-LIMIT 30;
+-- Stage 1: repeat winner concentration per buyer + CPV — shortlist tenders to open.
+-- A supplier winning the same buyer's CPV repeatedly is where designated-winner / cover-bid patterns hide.
+SELECT s."pirkejoKodas",
+       MAX(s.pirkejas)            AS pirkejas,
+       LEFT(s."bvpzKodas", 3)     AS cpvGrupe,
+       s."tiekejoKodas",
+       MAX(s.tiekejas)            AS tiekejas,
+       COUNT(*)                   AS laimejimuKiekis,
+       ROUND(SUM(s.verte))        AS bendraVerte
+FROM v_sutartys s
+WHERE s.istrinta IS NOT TRUE AND s."bvpzKodas" IS NOT NULL
+GROUP BY s."pirkejoKodas", LEFT(s."bvpzKodas", 3), s."tiekejoKodas"
+HAVING COUNT(*) >= 5
+ORDER BY laimejimuKiekis DESC, bendraVerte DESC
+LIMIT 40;
 ```
+
+**Stage 2 (per shortlisted procurement):** `get_viesasis_pirkimas(pirkimoId)` → open the ATN-1 file →
+`get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)`. On **p.7 (`VII.3`)** read each bidder's price and rank; flag
+losing bids that sit just fractionally above the winner, the same firms recurring as designated losers across the
+buyer's tenders, and round-number or implausibly uniform spreads. Record the procurement IDs, bidder codes, and prices
+verbatim — these are the evidence for a KT/STT referral.
