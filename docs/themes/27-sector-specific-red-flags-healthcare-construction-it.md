@@ -22,42 +22,43 @@ manipulation that generic cross-sector queries may miss.
 ## SQL Examples
 
 ```sql
--- Healthcare (CPV 33xxx): tenders with single bidder only — limited competition signal
-SELECT vp."pirkimoId",
-       vp.pavadinimas,
-       a."pirkimoObjektoPavadinimas",
-       vp."numatomaVerteEUR"   AS verteEur,
-       COUNT(DISTINCT d.kodas) AS dalyviuKiekis
-FROM "viesiejiPirkimai" vp
-         JOIN "atn1ataskaitos" a ON a."pirkimoNumeris" = vp."pirkimoId"
-         JOIN "atn1dalyviai" d ON d."ataskaitaId" = a.id
-WHERE EXISTS (SELECT 1 FROM unnest(vp."bvpzKodai") c WHERE c LIKE '33%')
-GROUP BY vp."pirkimoId", vp.pavadinimas, a."pirkimoObjektoPavadinimas", vp."numatomaVerteEUR"
-HAVING COUNT(DISTINCT d.kodas) = 1
-   AND vp."numatomaVerteEUR" > 30000
-ORDER BY verteEur DESC
+-- Healthcare (CPV 33xxx): high-value contracts concentrated in one supplier per buyer — limited-competition candidates.
+-- Bidder counts are not queryable; confirm single-bidding per procurement from the ATN-1 file (see note below).
+SELECT s."pirkejoKodas",
+       MAX(s.pirkejas)     AS pirkejas,
+       s."tiekejoKodas",
+       MAX(s.tiekejas)     AS tiekejas,
+       COUNT(*)            AS sutarciuKiekis,
+       ROUND(SUM(s.verte)) AS bendraVerte
+FROM v_sutartys s
+WHERE s.istrinta IS NOT TRUE
+  AND LEFT(s."bvpzKodas", 2) = '33'
+GROUP BY s."pirkejoKodas", s."tiekejoKodas"
+HAVING COUNT(*) >= 3 AND SUM(s.verte) > 30000
+ORDER BY bendraVerte DESC
 LIMIT 30;
 ```
 
 ```sql
--- IT sector (CPV 72xxx): same supplier winning repeatedly from same buyer across 5+ years (lock-in signal)
-SELECT s."perkanciosiosOrganizacijosKodas"                                                 AS pirkejoKodas,
-       jb.pavadinimas                                                                      AS pirkejas,
+-- IT sector (CPV 72xxx): same supplier winning repeatedly from the same buyer across 5+ years (lock-in signal).
+SELECT s."pirkejoKodas",
+       MAX(s.pirkejas)                                                                     AS pirkejas,
        s."tiekejoKodas",
-       js.pavadinimas                                                                      AS tiekejas,
+       MAX(s.tiekejas)                                                                     AS tiekejas,
        COUNT(*)                                                                            AS sutarciuKiekis,
-       SUM(s.verte)                                                                        AS totalVerte,
+       ROUND(SUM(s.verte))                                                                 AS totalVerte,
        MIN(EXTRACT(YEAR FROM s."sudarymoData"))                                            AS pirmiMetai,
        MAX(EXTRACT(YEAR FROM s."sudarymoData"))                                            AS paskutiMetai,
        MAX(EXTRACT(YEAR FROM s."sudarymoData")) - MIN(EXTRACT(YEAR FROM s."sudarymoData")) AS metaiAktyvus
-FROM sutartys s
-         JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" js
-ON js."jarKodas":: text = s."tiekejoKodas"
-    JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
-WHERE EXISTS (SELECT 1 FROM unnest(vp."bvpzKodai") c WHERE c LIKE '72%') AND s.istrinta = false
-GROUP BY s."perkanciosiosOrganizacijosKodas", jb.pavadinimas, s."tiekejoKodas", js.pavadinimas
+FROM v_sutartys s
+WHERE s.istrinta IS NOT TRUE AND LEFT(s."bvpzKodas", 2) = '72'
+GROUP BY s."pirkejoKodas", s."tiekejoKodas"
 HAVING COUNT(*) >= 5 AND MAX(EXTRACT(YEAR FROM s."sudarymoData")) - MIN(EXTRACT(YEAR FROM s."sudarymoData")) >= 5
 ORDER BY totalVerte DESC
 LIMIT 30;
 ```
+
+> **Confirm limited competition per procurement.** For the top healthcare rows, `get_viesasis_pirkimas` →
+> `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` and count `VI. DALYVIAI` — one bidder confirms a single-bidder
+> tender (theme 28). The `bvpzKodas` prefix is a coarse CPV filter; refine sector boundaries with the `bvpzKodai`
+> reference table where precision matters.

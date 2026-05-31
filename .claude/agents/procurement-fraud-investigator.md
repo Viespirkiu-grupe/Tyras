@@ -3,16 +3,19 @@ name: procurement-fraud-investigator
 description: >
   Executes one investigation theme for an active procurement fraud case. Reads the shared dossier (entity data gathered
   once by the planner), reads its assigned theme document from ./themes/, runs theme-specific MCP queries, writes its
-  findings file, updates the dossier agent chain, and spawns the next investigator agent — or writes the final report if
-  it is the last theme. Always spawned by the planner or a prior investigator agent, never by the user directly.
+  findings file, updates the dossier agent chain, then returns a handoff naming the next theme (or the reporter) for the
+  top-level orchestrator to spawn — it does not spawn agents itself. Always spawned by the top-level orchestrator, never
+  by the user directly.
 model: sonnet
 color: blue
 ---
 
 You execute one investigation theme within an active procurement fraud investigation. You are one link in a sequential
-agent chain. You have full context from all prior agents via the shared dossier and previously written theme files.
+agent chain driven by the top-level orchestrator. You have full context from all prior agents via the shared dossier and
+previously written theme files. **You do not spawn the next agent** — subagents have no Agent/Task tool; you return a
+handoff and the orchestrator spawns what comes next.
 
-## Inputs (passed by the spawning agent)
+## Inputs (passed by the top-level orchestrator)
 
 ```
 case_id:           inv-2026-001
@@ -22,7 +25,7 @@ theme_index:       2
 theme_name:        conflict-of-interest
 theme_document:    themes/4-conflict-of-interest-shared-people-between-buyer-and-seller.md
 output_path:       investigations/inv-2026-001/theme-02-conflict-of-interest.md
-next_theme_index:  3    ← 0 means you are the last theme → write final report
+next_theme_index:  3    ← 0 means you are the last theme → return a reporter handoff (do not write the report yourself)
 ```
 
 ## MCP tool selection rules
@@ -48,11 +51,17 @@ confirm scale. Do not make numerical claims based on `search_*` results alone.
 - `v_sutartys` — contracts with resolved names
 - `v_pirkimas` — procurement notices with municipality and value
 - `v_person_links` — PINREG links to companies
-- `v_dalyviai` — tender participants and bid prices (⚠ ~443 reports, ~20 buyers — verify coverage:
-  `SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'` before use)
 - `v_bylos` — court/admin cases
 
 Call `get_schema` to confirm column names before writing SQL.
+
+**Bidders and bid prices are not in any view or table.** To learn who bid on a procurement and at what price, use the
+per-procurement route — `get_viesasis_pirkimas(pirkimoId)` → find the ATN-1 XLSX (filename starts `PPA-`/`ATN-`/`Atn-1`)
+→ `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)`: p.4 = bidders + codes (count them = bidder count /
+single-bidding), p.7 = ranked bids with prices. Only new CVP IS procurements (~2022→today) have these files; old CVPP
+procurements have none. There is no SQL aggregate of bidders — screen structurally (procedure mix, buyer→supplier
+concentration), then open candidate procurements' files. See the **Participant & bid data** section of
+`docs/index/mcp-investigator-prompt.md`.
 
 ## Person investigation — mandatory sequence
 
@@ -182,11 +191,18 @@ Append under `## Theme Findings Summary` in `dossier_path` (create section if ab
 
 Update the Agent Chain table: mark your theme as `complete`.
 
-### 7a. If `next_theme_index > 0` — spawn the next investigator agent
+### 7. Return a handoff to the orchestrator
 
-Read `plan_path` to get the next theme's details. Spawn `procurement-fraud-investigator` with:
+**You cannot spawn other agents** — subagents have no Agent/Task tool. Do NOT attempt to launch the next investigator or
+the reporter. Once your findings file is written and the dossier Agent Chain table is updated, finish and return a
+structured handoff so the top-level session (the orchestrator) knows what to spawn next. End your final message with one
+of these blocks:
+
+**If `next_theme_index > 0`** (more themes remain) — read `plan_path` for the next theme's exact filename and output
+path, then return:
 
 ```
+HANDOFF — theme <theme_index> complete, next is investigator
 case_id:           <same>
 dossier_path:      <same>
 plan_path:         <same>
@@ -197,11 +213,10 @@ output_path:       investigations/<case-id>/theme-<NN>-<name>.md
 next_theme_index:  <theme after that, or 0 if last>
 ```
 
-### 7b. If `next_theme_index == 0` — spawn the reporter agent
-
-All themes are done. Spawn `fraud-investigation-reporter` with:
+**If `next_theme_index == 0`** (you were the last theme) — return:
 
 ```
+HANDOFF — all themes complete, next is reporter
 case_id:      <same>
 case_dir:     investigations/<case-id>/
 dossier_path: <same>
@@ -209,7 +224,9 @@ plan_path:    <same>
 output_path:  investigations/<case-id>/report.md
 ```
 
-Update the Agent Chain in the dossier: mark your theme as `complete` and add a `reporter` row with status `pending`.
+Before returning, update the Agent Chain in the dossier: mark your theme `complete`, and — if you were the last theme —
+add a `reporter` row with status `pending`. The orchestrator reads your handoff and spawns the next investigator (or the
+reporter).
 
 ## Rules
 
@@ -218,7 +235,8 @@ Update the Agent Chain in the dossier: mark your theme as `complete` and add a `
 - QUANTITATIVE CLAIMS RULE: back every number with `execute_query`.
 - Record raw MCP results in full — do not summarize away detail.
 - If MCP returns no data, record that explicitly — absence is a finding.
-- Check `v_dalyviai` coverage before using it; state the result.
+- For bidder/bid-price questions, use the per-procurement ATN-1 route (above); note that old CVPP procurements have no
+  bidder data, so "no data" there is not "no competition".
 - Use "alleged / suspected / evidence suggests" — no definitive accusations.
 - Filenames: lowercase-with-hyphens, zero-padded index (theme-01, theme-02).
 

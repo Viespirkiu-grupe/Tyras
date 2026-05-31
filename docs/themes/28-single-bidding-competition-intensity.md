@@ -7,156 +7,114 @@ indicator in EU public-procurement research (Fazekas / DIGIWHIST Corruption Risk
 single-bidder rate signals competition that is absent, suppressed, or steered: specifications written for one supplier
 (theme 14), restricted invitee circles (theme 20), cover-bidding that collapsed (theme 2), or a structural monopoly
 (theme 23). It is a **screening indicator**, not proof — a single bid can be legitimate (genuinely thin market). Its
-value is comparative: buyers, suppliers, and CPV sectors whose single-bidder rate is materially above the baseline
-warrant a closer look.
+value is comparative: buyers, suppliers, and CPV sectors that repeatedly run uncontested procedures warrant a closer
+look.
 
-This theme makes single-bidding a first-class, computed indicator rather than a side-effect of themes 2/20. It is the
-seed of the planned Tyras indicator framework (see `TODO-domain.md` P1.1).
+This theme makes single-bidding a first-class indicator rather than a side-effect of themes 2/20.
 
-- **Tools:** `execute_query` (the bidder count is only computable in SQL)
-- **Goal:** Compute the single-bidder rate per buyer, per supplier, and per CPV from `v_dalyviai`, rank entities against
-  the covered-set baseline, and — where `v_dalyviai` has no coverage — state that competition intensity is
-  **unmeasured** and pivot to the structural proxies below.
+- **Tools:** `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `get_failas_tekstas`, `execute_query` (structural
+  screening)
+- **Goal:** Identify buyers/suppliers/sectors that systematically run uncontested procedures, and confirm single-bidding
+  on individual procurements by reading their bidder list.
 - **Supervisory authorities:** STT, KT, VPT
 - **OSINT sources:** sector market structure (how many capable suppliers plausibly exist), media on contested tenders
 
-## Coverage — read before running anything
+## How bidder counts are obtained — read first
 
-`v_dalyviai` (ATN1 bidder data) covers **only ~400 procurements from ~38 buyers**, and one buyer (JAR `135163499`, Kauno
-klinikos) is ~62% of it. In the covered set the single-bidder rate is **25.7%** (102 / 397 procurements; verified). Two
-hard consequences:
+There is **no queryable table or view of bidders or bid counts**. The number of bidders on a procurement is read **one
+procurement at a time** from its official **ATN-1 "Pirkimo procedūrų ataskaita"** XLSX (see the **Participant & bid
+data** section of the MCP index):
 
-- **For ~all other buyers/suppliers, bidder counts do not exist.** An empty result is **no data, not full competition.**
-  Never report "no single-bidding concerns" for an entity with zero ATN1 coverage — say the indicator is uncomputable
-  and use the proxies in the last section.
-- **`v_dalyviai.eileNumeris` is 100% NULL** (verified, raw and view) — the bid _rank_ / winner is **not recoverable**
-  from this data. Single-bidding sidesteps this: in a one-bidder procurement the sole bidder is the winner by
-  definition, so no rank column is needed. (Any theme query that filters `eileNumeris = 1` returns nothing — see theme 2
-  caveat.)
+1. `get_viesasis_pirkimas(pirkimoId)` → find the ATN-1 file (filename starts `PPA-`, `ATN-`, or `Atn-1`, `xlsx`).
+2. `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` → **p.4 `VI. DALYVIAI (KANDIDATAI)`** lists every bidder with
+   its JAR code. **Count the bidder rows.** One bidder = single-bidding. (p.7 `VII.3` gives the ranked bid list with
+   prices if you also need the winner/margins.)
 
-Always confirm coverage first:
-`SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'`. If 0, this theme is
-inoperative for that entity.
+Two consequences for scope:
+
+- **Only new CVP IS procurements (≈2022→today) have these files.** Old CVPP procurements (2017→2024) carry **no** bidder
+  data — single-bidding cannot be determined for them. State this rather than implying competition was present.
+- **There is no market-wide single-bidder rate to query.** Do not report an aggregate percentage. Instead screen
+  structurally (below) to find where uncompetitive procedures cluster, then open the ATN-1 files of the specific
+  procurements to confirm the bidder count.
 
 ## To Detect
 
-- **Single-bidder rate per buyer** vs. the covered-set baseline (25.7%) — buyers materially above it with enough volume
-  are systematically running uncompetitive procedures.
-- **Single-bidder rate per CPV division** — sectors where competition is structurally or artificially thin (IT services
-  `72`, medical `33` ran high in the covered set).
-- **Uncontested-participation rate per supplier** — suppliers who repeatedly bid **and** were the only bidder. A
-  supplier that keeps winning uncontested for the same buyer is a favoritism / spec-rigging lead (cross-check themes 14,
-  19, 23).
-- **The single-bidder flag on a specific procurement** — a binary red flag feeding the composite risk score (P1.2).
+A two-stage method — screen at scale, then confirm per procurement:
 
-> **Threshold guidance:** treat the covered-set rate (≈26%) as the internal baseline. Flag a buyer/CPV/supplier only
-> with a meaningful denominator (≥5 procurements) **and** a rate well above baseline (≥50% is a strong screen). A single
-> uncontested procurement is a data point, not a pattern.
+**Stage 1 — structural screen (SQL, whole market).** Find buyers / suppliers / sectors whose procedure and award
+patterns predict low competition, and shortlist candidate procurements:
 
-## SQL Examples
-
-```sql
--- Single-bidder rate per BUYER (covered set). Bidders counted per procurement, then aggregated by buyer.
--- Baseline for comparison: ~25.7% across all covered procurements.
-SELECT p."pirkejoKodas",
-       MAX(j.pavadinimas)                                        AS pirkejas,
-       COUNT(*)                                                  AS pirkimuKiekis,
-       COUNT(*) FILTER (WHERE p.bidders = 1)                     AS vienoDalyvio,
-       ROUND(100.0 * COUNT(*) FILTER (WHERE p.bidders = 1) / COUNT(*), 1) AS vienoDalyvioProc
-FROM (SELECT "pirkimoNumeris",
-             "pirkejoKodas",
-             COUNT(DISTINCT "tiekejoKodas") AS bidders
-      FROM v_dalyviai
-      WHERE "tiekejoKodas" IS NOT NULL AND "tiekejoKodas" <> ''
-      GROUP BY "pirkimoNumeris", "pirkejoKodas") p
-         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = p."pirkejoKodas"
-GROUP BY p."pirkejoKodas"
-HAVING COUNT(*) >= 5
-ORDER BY vienoDalyvioProc DESC, pirkimuKiekis DESC
-LIMIT 30;
-```
-
-```sql
--- Single-bidder rate per CPV division (first 2 digits of bvpz). Surfaces sectors with thin competition.
-SELECT LEFT(p."pagrindinisKodasBvpz", 2)                         AS cpvSkyrius,
-       COUNT(*)                                                  AS pirkimuKiekis,
-       COUNT(*) FILTER (WHERE p.bidders = 1)                     AS vienoDalyvio,
-       ROUND(100.0 * COUNT(*) FILTER (WHERE p.bidders = 1) / COUNT(*), 1) AS vienoDalyvioProc
-FROM (SELECT "pirkimoNumeris",
-             MAX("pagrindinisKodasBvpz")    AS "pagrindinisKodasBvpz",
-             COUNT(DISTINCT "tiekejoKodas") AS bidders
-      FROM v_dalyviai
-      WHERE "tiekejoKodas" IS NOT NULL AND "tiekejoKodas" <> ''
-      GROUP BY "pirkimoNumeris") p
-WHERE p."pagrindinisKodasBvpz" IS NOT NULL
-GROUP BY LEFT(p."pagrindinisKodasBvpz", 2)
-HAVING COUNT(*) >= 5
-ORDER BY vienoDalyvioProc DESC
-LIMIT 30;
-```
-
-```sql
--- Uncontested-participation rate per SUPPLIER: of the procurements a supplier bid in, how many had only it.
--- (Sole bidder = winner, so this is also the supplier's uncontested-win rate; no eileNumeris needed.)
-SELECT d."tiekejoKodas",
-       MAX(d.tiekejas)                                                             AS tiekejas,
-       COUNT(DISTINCT d."pirkimoNumeris")                                          AS dalyvavoPirkimuose,
-       COUNT(DISTINCT d."pirkimoNumeris") FILTER (WHERE b.bidders = 1)             AS vienintelisDalyvis,
-       ROUND(100.0 * COUNT(DISTINCT d."pirkimoNumeris") FILTER (WHERE b.bidders = 1)
-                 / COUNT(DISTINCT d."pirkimoNumeris"), 1)                          AS neturejoKonkurencijosProc
-FROM v_dalyviai d
-         JOIN (SELECT "pirkimoNumeris",
-                      COUNT(DISTINCT "tiekejoKodas") AS bidders
-               FROM v_dalyviai
-               WHERE "tiekejoKodas" IS NOT NULL AND "tiekejoKodas" <> ''
-               GROUP BY "pirkimoNumeris") b ON b."pirkimoNumeris" = d."pirkimoNumeris"
-WHERE d."tiekejoKodas" IS NOT NULL AND d."tiekejoKodas" <> ''
-GROUP BY d."tiekejoKodas"
-HAVING COUNT(DISTINCT d."pirkimoNumeris") >= 4
-ORDER BY neturejoKonkurencijosProc DESC, dalyvavoPirkimuose DESC
-LIMIT 30;
-```
-
-```sql
--- The single-bidder flag for one buyer's individual procurements (drill-down / risk-score feed).
--- Parameterise :kodas with the buyer JAR code under investigation.
-SELECT "pirkimoNumeris",
-       MAX("pirkimoObjektoPavadinimas")  AS objektas,
-       MAX("pagrindinisKodasBvpz")       AS bvpz,
-       COUNT(DISTINCT "tiekejoKodas")     AS dalyviuSkaicius,
-       (COUNT(DISTINCT "tiekejoKodas") = 1) AS vienoDalyvioVeliava
-FROM v_dalyviai
-WHERE "pirkejoKodas" = :kodas
-  AND "tiekejoKodas" IS NOT NULL AND "tiekejoKodas" <> ''
-GROUP BY "pirkimoNumeris"
-ORDER BY dalyviuSkaicius ASC, "pirkimoNumeris";
-```
-
-## Where `v_dalyviai` has no coverage — structural proxies (lower confidence)
-
-There is **no bid-count field anywhere outside `v_dalyviai`** — `sutartysAtviriDuomenys`, `cvppViesiejiPirkimai`, and
-`v_pirkimas` record awards and notices, **not the number of tenders received**. So true single-bidding cannot be
-measured for uncovered buyers. The honest fallback is to flag _structural_ lack of competition, clearly labelled as a
-different (weaker) signal:
-
+- **Non-competitive procedure mix per buyer** — share of direct-award / negotiated / single-source procedures in
+  `v_pirkimas.pirkimoBudas` (overlaps themes 7, 20). High share = competition routinely bypassed.
 - **De-facto single-source procedures** — `neskelbiamosDerybos` audit findings (theme 20) name buyers who ran
   unadvertised negotiations; these are uncontested by construction.
-- **Single-supplier dominance** — repeat buyer→supplier concentration in `v_sutartys` (themes 6, 19, 23): one supplier
-  taking a dominant share of a buyer's contracts in a CPV is the _outcome_ a high single-bidder rate would predict.
-- **Procedure mix** — share of non-open procedures in `v_pirkimas.pirkimoBudas` by buyer (theme 7/20). Note this view
-  lists **published** procedures only and includes non-award rows (`Rinkos konsultacija`), so it is a coarse proxy, not
-  a count.
+- **Repeat buyer→supplier concentration** — one supplier taking a dominant share of a buyer's contracts in a CPV in
+  `v_sutartys` (themes 6, 19, 23) is the _outcome_ a high single-bidder rate produces.
 
-State explicitly in any referral that these proxies measure procedural/market structure, **not** observed bidder counts,
-and that observed single-bidding could not be computed for the entity due to ATN1 coverage limits (theme caveat above).
+**Stage 2 — confirm on the procurement (ATN-1 file).** For each shortlisted new-CVP-IS procurement, open its ATN-1
+report and count the `VI. DALYVIAI` rows:
+
+- **One bidder** → confirmed single-bidding; a binary red flag for that procurement (feeds the composite risk score).
+- A supplier that is repeatedly the **only** bidder for the same buyer is a favoritism / spec-rigging lead (cross-check
+  themes 14, 19, 23).
+
+> **Threshold guidance:** single-bidding is a screen, not proof. Weight it by how contestable the market plausibly is
+> (sector, value, lot design): a sole bid for a niche specialist service is weaker than a sole bid for a commodity many
+> firms supply. A pattern across several of a buyer's procurements is far stronger than a single instance. EU research
+> treats systematically high single-bidder rates (well above a peer/sector norm) as the headline risk flag.
+
+## SQL Examples (Stage-1 structural screen)
+
+These run against still-queryable views; they do **not** measure bidder counts (which require the ATN-1 files) — they
+surface where to look.
+
+```sql
+-- Procedure mix per buyer: share of non-open / negotiated procedures (competition-bypass screen).
+-- High "uždaroProc" buyers are the ones whose individual procurements are worth opening for a bidder count.
+SELECT "jarKodas"                         AS pirkejoKodas,
+       MAX(organizatorius)                AS pirkejas,
+       COUNT(*)                           AS pirkimuKiekis,
+       COUNT(*) FILTER (WHERE "pirkimoBudas" NOT ILIKE '%atviras%')        AS neAtviri,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE "pirkimoBudas" NOT ILIKE '%atviras%')
+                 / COUNT(*), 1)           AS neAtviruProc
+FROM v_pirkimas
+WHERE "jarKodas" IS NOT NULL
+GROUP BY "jarKodas"
+HAVING COUNT(*) >= 10
+ORDER BY neAtviruProc DESC, pirkimuKiekis DESC
+LIMIT 30;
+```
+
+```sql
+-- Buyer→supplier concentration in a CPV division: a dominant supplier is what a high single-bidder rate predicts.
+-- Parameterise the CPV prefix; HAVING keeps pairs with a meaningful share.
+SELECT s."pirkejoKodas",
+       MAX(s.pirkejas)                                   AS pirkejas,
+       s."tiekejoKodas",
+       MAX(s.tiekejas)                                   AS tiekejas,
+       COUNT(*)                                          AS sutarciuKiekis,
+       ROUND(SUM(s.verte))                               AS bendraVerte
+FROM v_sutartys s
+WHERE s.istrinta IS NOT TRUE
+  AND LEFT(s."bvpzKodas", 2) = '72'        -- e.g. IT services; change per sector
+GROUP BY s."pirkejoKodas", s."tiekejoKodas"
+HAVING COUNT(*) >= 5
+ORDER BY sutarciuKiekis DESC, bendraVerte DESC
+LIMIT 30;
+```
+
+Then, for the procurements behind the top rows, run `get_viesasis_pirkimas` → `get_failas_tekstas` and count the
+`VI. DALYVIAI` bidders to confirm whether the wins were uncontested.
 
 ## Followup
 
 **Gap (data):**
 
-- **Bidder counts exist only for ~38 buyers** — the single strongest corruption proxy is, in practice, computable only
-  for a sliver of the market. Broader ATN1 ingestion (or a notice-level "tenders received" field) would make this
-  indicator system-wide; flagged for the MCP team in `TODO-domain.md`.
-- **`eileNumeris` is unpopulated** — bid rank / winner-vs-loser structure is unavailable, so this theme is limited to
-  the count dimension (single vs. multi) and cannot extend to winning-margin or cover-bid-spread analysis (theme 2/17)
-  on the same data.
+- **Bidder counts are file-bound and CVP-IS-only.** They can be read only from new-CVP-IS ATN-1 reports, one procurement
+  at a time; old CVPP procurements have none, and there is no notice-level "tenders received" field. So single-bidding
+  cannot be computed as a market-wide rate — it is a per-procurement confirmation guided by a structural screen. A
+  notice-level bid-count field would let the strongest corruption proxy run across the whole market (candidate MCP
+  feature request, tracked in `TODO-domain.md`).
+- **Report what was checked.** In a referral, state which specific procurements were opened, how many bidders each had,
+  and that single-bidding could not be assessed for procurements without an ATN-1 report.
