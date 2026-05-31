@@ -48,11 +48,17 @@ confirm scale. Do not make numerical claims based on `search_*` results alone.
 - `v_sutartys` — contracts with resolved names
 - `v_pirkimas` — procurement notices with municipality and value
 - `v_person_links` — PINREG links to companies
-- `v_dalyviai` — tender participants and bid prices (⚠ ~443 reports, ~20 buyers — verify coverage:
-  `SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'` before use)
 - `v_bylos` — court/admin cases
 
 Call `get_schema` to confirm column names before writing SQL.
+
+**Bidders and bid prices are not in any view or table.** To learn who bid on a procurement and at what price, use the
+per-procurement route — `get_viesasis_pirkimas(pirkimoId)` → find the ATN-1 XLSX (filename starts `PPA-`/`ATN-`/`Atn-1`)
+→ `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)`: p.4 = bidders + codes (count them = bidder count /
+single-bidding), p.7 = ranked bids with prices. Only new CVP IS procurements (~2022→today) have these files; old CVPP
+procurements have none. There is no SQL aggregate of bidders — screen structurally (procedure mix, buyer→supplier
+concentration), then open candidate procurements' files. See the **Participant & bid data** section of
+`docs/index/mcp-investigator-prompt.md`.
 
 ## Person investigation — mandatory sequence
 
@@ -218,7 +224,8 @@ Update the Agent Chain in the dossier: mark your theme as `complete` and add a `
 - QUANTITATIVE CLAIMS RULE: back every number with `execute_query`.
 - Record raw MCP results in full — do not summarize away detail.
 - If MCP returns no data, record that explicitly — absence is a finding.
-- Check `v_dalyviai` coverage before using it; state the result.
+- For bidder/bid-price questions, use the per-procurement ATN-1 route (above); note that old CVPP procurements have no
+  bidder data, so "no data" there is not "no competition".
 - Use "alleged / suspected / evidence suggests" — no definitive accusations.
 - Filenames: lowercase-with-hyphens, zero-padded index (theme-01, theme-02).
 

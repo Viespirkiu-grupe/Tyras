@@ -57,10 +57,11 @@ confirm scale. Do not make numerical claims based on `search_*` results alone.
 - `v_sutartys` — contracts with resolved buyer/supplier names
 - `v_pirkimas` — procurement notices with municipality and value
 - `v_person_links` — PINREG links to companies
-- `v_dalyviai` — tender participants and bid prices (⚠ ~443 reports, ~20 buyers only — verify coverage before use)
 - `v_bylos` — court/admin cases linked to companies
 
-Call `get_schema` to confirm column names before writing SQL.
+Call `get_schema` to confirm column names before writing SQL. Bidders and bid prices are not in any view — they are read
+per procurement from the ATN-1 XLSX via `get_viesasis_pirkimas` → `get_failas_tekstas` (only new CVP IS procurements,
+~2022→today; see **Participant & bid data** in `docs/index/mcp-investigator-prompt.md`).
 
 ## Workflow
 

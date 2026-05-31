@@ -58,10 +58,10 @@
 ### P0.3 Enforce the quantitative-claims and coverage gates with hooks, not prose
 
 - **What:** Hooks/scripts that (a) block report finalisation if any theme file contains a number with no ledger
-  citation, and (b) refuse `v_dalyviai` conclusions unless the `COUNT(*)` coverage check for that buyer is present in
-  the ledger.
-- **Why:** The `v_dalyviai` "~443 reports / ~20 buyers" trap and the "search\_\* can't confirm scale" rule are both
-  well-written prose that the LLM may still skip under context pressure. Harness-level enforcement is deterministic.
+  citation, and (b) refuse bidder/competition conclusions unless they cite a specific procurement's ATN-1 file read (or
+  are explicitly marked "no ATN-1 report available" for that procurement).
+- **Why:** The "old CVPP has no bidder data" trap and the "search\_\* can't confirm scale" rule are both well-written
+  prose that the LLM may still skip under context pressure. Harness-level enforcement is deterministic.
 - **Surface:** Hooks + small validation script in the repo.
 
 ### P0.4 Capture raw tool results including errors; define failure behaviour
@@ -170,13 +170,15 @@
   themes and investigations and defensible in a referral.
 - **Surface:** scoring rubric in the Skill + reporter logic.
 
-### P2.3 Elevate single-bidding to a first-class indicator
+### P2.3 Elevate single-bidding to a first-class indicator — DONE (theme 28)
 
-- **What:** Make single-bidding (one bidder on a tender that should attract competition) a dedicated, always-run
-  indicator rather than a sub-point of themes 2/20.
+- **What:** Single-bidding is now a dedicated theme ([28](docs/themes/28-single-bidding-competition-intensity.md)): a
+  structural screen (procedure mix, buyer→supplier concentration) to shortlist, then a per-procurement bidder count from
+  each ATN-1 file. Cross-referenced from themes 2, 14, 17, 20, 27.
 - **Why:** Single-bidding is the strongest empirically validated corruption proxy in EU procurement literature; it
   deserves headline status and consistent measurement.
-- **Surface:** new/expanded theme + indicator framework (P2.1).
+- **Remaining:** fold the structural screen into the P2.1 indicator framework once that lands; a notice-level bid-count
+  field (P3.9) would let it run market-wide instead of per procurement.
 
 ### P2.4 Maintained thresholds & reference-data table
 
@@ -259,10 +261,12 @@
 ### P3.9 MCP server feature requests (dependency-side)
 
 - **What:** Track upstream asks to the MCP server: a real `count`/cursor on `search_*` (today: max 50 rows,
-  `total: null`), and broader `atn1` (participant/bid) coverage beyond ~20 buyers.
-- **Why:** The entire `QUANTITATIVE CLAIMS RULE` exists to work around `search_*` being unable to confirm scale, and the
-  `v_dalyviai` coverage gap caps competition analysis. Fixing these at the source removes whole classes of workaround
-  and hallucination risk. Out of this repo, but the highest-value external dependency.
+  `total: null`), and a **notice-level "tenders received" / bidder-count field** so single-bidding can be computed
+  market-wide instead of read one ATN-1 file at a time (and ideally a structured participants endpoint so bid data isn't
+  only reachable by parsing XLSX page text).
+- **Why:** The entire `QUANTITATIVE CLAIMS RULE` exists to work around `search_*` being unable to confirm scale, and
+  bid-level competition analysis is currently per-procurement and qualitative only. Fixing these at the source removes
+  whole classes of workaround and hallucination risk. Out of this repo, but the highest-value external dependency.
 - **Surface:** upstream issue against the MCP server.
 
 ---

@@ -14,28 +14,39 @@ technical requirements.
 
 ## To Detect
 
-- Single-bidder rate vs. CPV national average.
-- Repeat winner in single-bidder tenders.
+- Single-bidder procurements concentrated in one buyer/CPV (the outcome spec-rigging produces) — confirmed via
+  [theme 28](28-single-bidding-competition-intensity.md)'s per-procurement bidder count.
+- Repeat winner in those single-bidder tenders.
 - Technical specification language that matches one brand/model; repeated exclusionary requirements (e.g. specific
-  patents, small deviations).
+  patents, small deviations) — read from the tender documents via `search_failai` / `get_failas_tekstas`.
 - Use of overly narrow CPV codes or contract splitting to keep competition away.
 
-## SQL Examples
+## Method — screen structurally, confirm the single bidder, then read the spec
+
+Bidder counts are not queryable; they are read per procurement from the ATN-1 report (see
+[theme 28](28-single-bidding-competition-intensity.md) and the **Participant & bid data** section of the MCP index).
+
+1. **Shortlist (SQL).** Find buyer + CPV pairs where one supplier wins repeatedly — the pattern spec-rigging leaves
+   behind:
 
 ```sql
--- Buyers with highest single-bidder rate per CPV category (spec rigging signal)
-SELECT a."perkanciosiosOrganizacijosKodas" AS pirkejoKodas,
-       j.pavadinimas                       AS pirkejas, LEFT (vp."bvpzKodai"[1], 3) AS cpvGrupe, COUNT(DISTINCT a.id) AS pirkimuKiekis, COUNT(DISTINCT CASE WHEN dalyviu.cnt = 1 THEN a.id END) AS vienasdalyvys, ROUND(100.0 * COUNT(DISTINCT CASE WHEN dalyviu.cnt = 1 THEN a.id END)
-    / COUNT(DISTINCT a.id), 1) AS vienoDalyvioProcent
-FROM "atn1ataskaitos" a
-    JOIN "viesiejiPirkimai" vp
-ON vp."pirkimoId" = a."pirkimoNumeris"
-    JOIN "jarCsv" j ON j."jarKodas":: text = a."perkanciosiosOrganizacijosKodas"
-    JOIN (
-    SELECT "ataskaitaId", COUNT(*) AS cnt FROM "atn1dalyviai" GROUP BY "ataskaitaId"
-    ) dalyviu ON dalyviu."ataskaitaId" = a.id
-GROUP BY a."perkanciosiosOrganizacijosKodas", j.pavadinimas, LEFT (vp."bvpzKodai"[1], 3)
-HAVING COUNT(DISTINCT a.id) >= 5
-ORDER BY vienoDalyvioProcent DESC
+-- Buyer + CPV where a single supplier captures most contracts (spec-rigging candidate clusters).
+SELECT s."pirkejoKodas",
+       MAX(s.pirkejas)                  AS pirkejas,
+       LEFT(s."bvpzKodas", 3)           AS cpvGrupe,
+       s."tiekejoKodas",
+       MAX(s.tiekejas)                  AS tiekejas,
+       COUNT(*)                         AS laimejimuKiekis
+FROM v_sutartys s
+WHERE s.istrinta IS NOT TRUE AND s."bvpzKodas" IS NOT NULL
+GROUP BY s."pirkejoKodas", LEFT(s."bvpzKodas", 3), s."tiekejoKodas"
+HAVING COUNT(*) >= 5
+ORDER BY laimejimuKiekis DESC
 LIMIT 30;
 ```
+
+2. **Confirm single-bidding (ATN-1 file).** For the shortlisted procurements, `get_viesasis_pirkimas` →
+   `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` and count the `VI. DALYVIAI` rows — one bidder confirms the
+   tender was uncontested.
+3. **Read the specification.** Pull the tender's technical-requirements document (`search_failai` /
+   `get_failas_tekstas`) and look for brand/model-specific or otherwise exclusionary language that fits only the winner.

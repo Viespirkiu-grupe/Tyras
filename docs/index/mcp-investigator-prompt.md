@@ -14,6 +14,8 @@ first** mapping below:
 - Find companies by name or code → `search_juridiniai`
 - Find persons, emails, phones, IBANs in uploaded documents → `search_failai`
 - Find procurement notices → `search_viesieji_pirkimai`
+- Inspect who bid and at what price on a **specific** procurement → `get_viesasis_pirkimas` then `get_failas_tekstas` on
+  its ATN-1 file (see **Participant & bid data** below) — there is no SQL table for bidders/bid prices
 - Aggregate, count, compute ratios, join tables → `execute_query`
 
 > **QUANTITATIVE CLAIMS RULE**: Any statement about totals, counts, value sums, market share, or trends **MUST** be
@@ -40,21 +42,6 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
   `imonesVardas`, `pareigos`, `rysioPradzia`, `rysioPabaiga` (date-filter to avoid stale links), `susijusioAsmensVardas`
   / `susijusioAsmensPavarde` (spouse/family link), `dalyvaujaViesuosePirkimuose` (bool), `registruotaLietuvoje`,
   `yraJuridinisAsmuo`.
-- `v_dalyviai` [themes 2–3, 14, 17, 28]: joins `atn1ataskaitos`, `atn1dalyviai`, `atn1pasiulymuEile`,
-  `atn1atmestiPasiulymai` and `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`,
-  `salis` (bidder country — cross-border signal), `daliuSkaicius`, `pretenzijaPateikta` (bool), `ieskinysTeismui`
-  (bool). **The bidder count per procurement** (`COUNT(DISTINCT "tiekejoKodas") GROUP BY "pirkimoNumeris"`) drives the
-  single-bidding indicator (theme 28) — the strongest corruption proxy in the data. **⚠ `eileNumeris` is 100% NULL** in
-  current data (raw table and view) — bid rank / winner is **not recoverable**; any query filtering `eileNumeris = 1`
-  returns nothing (affects themes 2, 17). Single-bidding works around this (sole bidder = winner). **⚠ Two flag columns
-  are unreliable**: `interesuKonfliktasNustatytas` is never `true` in current data (unpopulated — do not treat absence
-  as "no conflict"); `konkurencijaIskreipiantisAsmuo` is `true` for ~48% of rows and is an administrative declaration,
-  **not** a fraud signal — do not use it as a red flag without separate validation. **⚠ Coverage**: ~400 reports from
-  ~38 buyer organisations only, heavily dominated by one buyer (JAR 135163499, Kauno klinikos, ~62% of reports). Before
-  querying `v_dalyviai` for a specific supplier or buyer, verify coverage:
-  `SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'`. If the result is 0,
-  competition analysis via this view is **not possible** for that entity — state this explicitly rather than inferring
-  absence of competition.
 - `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosNumeris`, `bylosRusis`, `bylosData`,
   `teismas`, `bylojeKaip`, `dalyvioPavadinimas`, `dalyvioVardasIrPavarde`.
 
@@ -74,6 +61,43 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
 > For human investigator: when adding new raw tables (e.g. new JAR ownership exports, VRK donor data, municipal
 > enterprise registries), extend this list and reference themes where the table is actually used. This keeps the LLM
 > focused on relevant sources and avoids spurious joins.
+
+### Participant & bid data — who bid and at what price (themes 2, 3, 14, 16, 17, 27, 28)
+
+Bidder lists and bid prices are **not** in any queryable table or view. They live inside the official **ATN-1 "Pirkimo
+procedūrų ataskaita"** XLSX attached to each procurement, and are read **one procurement at a time** — there is no SQL
+aggregate of bidder counts or bid prices:
+
+1. `get_viesasis_pirkimas(pirkimoId)` → returns the procurement's `failai` list (plus content and buyer data).
+2. In that list find the ATN-1 report — filename begins **`PPA-`**, **`ATN-`**, or **`Atn-1`**, extension `xlsx`. Take
+   its numeric `id`.
+3. `get_failas_tekstas(id, puslapis=4, kiekis=4)` → the bid-evaluation pages of the standard report:
+   - **p.4 — `VI. DALYVIAI (KANDIDATAI)`:** every bidder, with JAR code + country. **Counting these rows is the bidder
+     count** → single-bidding detection (theme 28); one bidder row = single bidder.
+   - **p.6 — `VII.2`:** non-submitting / withdrawn / rejected bids, with rejection grounds and prices.
+   - **p.7 — `VII.3` pasiūlymų eilė:** the ranked bid list — part no., **rank (eilės numeris)**, bidder code, **bid
+     price** (feeds cover-bidding margins, theme 2; within-tender price variation, theme 17).
+   - **p.10 — `XI. SUTARTYS`:** awarded contract value(s).
+
+**Caveats (apply every time):**
+
+- The page numbers above hold for the **standard single-part report (~11 pages)**. Large multi-part reports (80–130
+  pages) push these sections to later pages — there, pull a wider page range (`kiekis` up to 25) and locate the
+  `VI. DALYVIAI` / `VII.3` section headers in the returned text rather than trusting fixed page numbers.
+- Only **new CVP IS** procurements (≈2022→today) carry these files. **Old CVPP** procurements (2017→2024) have no
+  participant/bid data at all — `get_viesasis_pirkimas` cannot return it, and `cvppViesiejiPirkimai` is reachable only
+  via `execute_query` for metadata (who organised it, what, when), never for who-bid-what.
+- The route is **per-procurement and qualitative**. To work at scale, screen first with structural proxies — procedure
+  mix in `v_pirkimas.pirkimoBudas`, repeat buyer→supplier concentration in `v_sutartys`, `neskelbiamosDerybos` — to pick
+  a short list of candidate procurements, **then** open their ATN-1 files. Never state a market-wide bidder-count
+  statistic; report per-procurement observations.
+
+**Coverage (CVP IS vs CVPP):**
+
+| Source                                         | Records | Date range        | Participant / bid data |
+| ---------------------------------------------- | ------- | ----------------- | ---------------------- |
+| `cvppViesiejiPirkimai` (old CVPP)              | 257,556 | 2017-07 → 2024-12 | none                   |
+| `v_pirkimas` / `viesiejiPirkimai` (new CVP IS) | 44,466  | 2022-09 → today   | ATN-1 XLSX             |
 
 ### SABIS payment-flow analysis (themes 8, 18, 22, 25)
 

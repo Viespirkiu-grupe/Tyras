@@ -63,11 +63,15 @@ investigation prompt or modifying agent instructions.
 
 - **Discovery**: use `search_sutartys`, `search_juridiniai`, `search_failai`, `search_viesieji_pirkimai`
 - **Aggregations and scale confirmation**: use `execute_query` with views (`v_sutartys`, `v_company`, `v_pirkimas`,
-  `v_person_links`, `v_dalyviai`, `v_bylos`)
+  `v_person_links`, `v_bylos`)
 - **QUANTITATIVE CLAIMS RULE**: any count, total, or ratio must be backed by an `execute_query` result — `search_*`
   tools return at most 50 rows with `total: null` and cannot confirm scale
-- `v_dalyviai` has limited coverage (~443 reports, ~20 buyers); always verify with
-  `SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'` before use
+- **Bidders and bid prices are not queryable** — read them per procurement from the ATN-1 XLSX:
+  `get_viesasis_pirkimas(pirkimoId)` → ATN-1 file (filename `PPA-`/`ATN-`/`Atn-1`) →
+  `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` (p.4 bidders+codes, p.7 ranked bids+prices). Only new CVP IS
+  procurements (~2022→today) have these; old CVPP procurements have none. See **Participant & bid data** in
+  `docs/index/mcp-investigator-prompt.md`
+- `EXISTS` / correlated subqueries are blocked by the query engine — rewrite as JOIN + `GROUP BY`/`DISTINCT`
 - Call `get_schema` to confirm column names before writing SQL
 
 ### Person investigation sequence (mandatory, in order)

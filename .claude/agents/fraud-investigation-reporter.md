@@ -110,7 +110,8 @@ Founded 2023 | | Theme 01 | `execute_query` | v_company WHERE... | 30 rows | dra
 ## Unresolved Questions
 
 - Data gaps: queries that returned no results (note: absence is a finding)
-- `v_dalyviai` coverage gaps — buyers where ATN1 data was unavailable
+- Competition gaps — procurements without an ATN-1 report (old CVPP, or new procurements with no report attached) where
+  bidder counts and bid prices could not be read
 - Leads that emerged too late for investigation in this run
 - What requires investigative powers beyond MCP (bank records, internal correspondence, physical site verification,
   witness interviews)
