@@ -34,7 +34,9 @@ Read in this order:
 Do not query MCP. If you notice a gap that requires new data, note it in the report under **Unresolved Questions** — do
 not go back to MCP yourself.
 
-### 2. Write `output_path`
+### 2. Create `output_path` using the Write tool
+
+Use the Write tool to create the file at `output_path`. Do not return the report content in your response — write it to disk. The file does not exist yet; create it.
 
 ```markdown
 # Investigation Report — <Case ID>
@@ -177,6 +179,7 @@ Append to `dossier_path` under `## Agent Chain`:
 > unresolved questions, or MCP coverage issues you observed while synthesizing theme files. If the file already exists,
 > append only — never modify previous content.
 
+- **Write to disk.** Use the Write tool to create `output_path`. Do not return the report as a response — it must be a file.
 - No MCP queries. Synthesis only.
 - Every finding must cite a specific theme file or dossier section.
 - QUANTITATIVE CLAIMS RULE still applies: only repeat numbers that were backed by `execute_query` in the theme files —
