@@ -93,8 +93,8 @@ Create the file at `output_path`. Do not return the report as a response — wri
 Before finishing, scan every sentence in the report body:
 
 - Does it contain a verb that implies intent, coordination, or mechanism (coordinate, manipulate, design, exploit,
-  arrange, ensure, hide, conceal, collude)? If yes and no Tier 1 source uses that verb, rewrite as a Tier 2
-  observation or move to Unresolved Questions as a Tier 3 hypothesis.
+  arrange, ensure, hide, conceal, collude)? If yes and no Tier 1 source uses that verb, rewrite as a Tier 2 observation
+  or move to Unresolved Questions as a Tier 3 hypothesis.
 - Does it state a number that is not backed by an `execute_query` citation? Remove or replace with "not confirmed by
   aggregation query."
 - Does it describe a relationship between two entities without citing a Tier 1 source that directly links them? Rewrite
@@ -120,9 +120,9 @@ issues observed while organizing the theme files. Never modify prior content —
 ```markdown
 # Investigation Report — <Case ID>
 
-**Date:** <today>
-**Status:** Draft — requires human review before use
-**Case:** <one-line description>
+- **Date:** <today> 
+- **Status:** Draft — requires human review before use 
+- **Case:** <one-line description>
 
 ---
 
@@ -157,14 +157,14 @@ For each theme investigated, one section:
 
 ### Theme <N>: <Theme Name>
 
-**Source file:** `<filename>`
-**Priority:** High / Medium / Low
-**Confidence:** High / Medium / Low
+- **Source file:** `<filename>`
+- **Priority:** High / Medium / Low
+- **Confidence:** High / Medium / Low
 
-| Evidence tier | Source (file + tool call + parameters) | Result | Observation |
-|---|---|---|---|
-| Tier 1 | theme-NN, execute_query v_xxx WHERE ... | N rows, key value | <verbatim or close paraphrase of what the data says> |
-| Tier 2 | theme-NN (multiple Tier 1 results) | — | <pattern stated as observation, not explanation> |
+| Evidence tier | Source (file + tool call + parameters)  | Result            | Observation                                          |
+| ------------- | --------------------------------------- | ----------------- | ---------------------------------------------------- |
+| Tier 1        | theme-NN, execute_query v_xxx WHERE ... | N rows, key value | <verbatim or close paraphrase of what the data says> |
+| Tier 2        | theme-NN (multiple Tier 1 results)      | —                 | <pattern stated as observation, not explanation>     |
 
 **Supervisory authority flag:** STT / FNTT / VPT / VK / KT (as stated in theme file)
 
@@ -175,9 +175,9 @@ pattern. Absence noted."
 
 ## Cross-Theme Overlaps
 
-Structural overlaps only: entities, contracts, or addresses that appear independently in two or more theme files. Do
-not explain the overlap. Do not infer why the same entity appears in multiple themes. List the raw co-occurrence and
-cite both sources.
+Structural overlaps only: entities, contracts, or addresses that appear independently in two or more theme files. Do not
+explain the overlap. Do not infer why the same entity appears in multiple themes. List the raw co-occurrence and cite
+both sources.
 
 Format:
 
@@ -211,10 +211,10 @@ All numeric cells must cite the `execute_query` call that produced them. If a va
 
 Complete record of all MCP data gathered across the investigation.
 
-| Theme   | Tool | Key parameters | Result size | Key value or finding |
-|---------|---|---|---|---|
-| Planner | get_juridinis | jar_kodas=... | 1 record | <field: value> |
-| Theme NN | execute_query | v_xxx WHERE ... | N rows | <key metric> |
+| Theme    | Tool          | Key parameters  | Result size | Key value or finding |
+| -------- | ------------- | --------------- | ----------- | -------------------- |
+| Planner  | get_juridinis | jar_kodas=...   | 1 record    | <field: value>       |
+| Theme NN | execute_query | v_xxx WHERE ... | N rows      | <key metric>         |
 
 Include null results: if a query returned 0 rows, include it — absence is evidence.
 
@@ -228,8 +228,8 @@ identify the Tier 2 pattern it is trying to explain and the investigative step r
 - **Data gaps:** queries that returned no results; procurements without ATN-1 reports; entities with no PINREG record.
 - **Hypotheses:** <Tier 3 items — labeled, tied to Tier 2 pattern, with verification step specified>
 - **Leads not pursued:** investigative directions that emerged too late in this run.
-- **Beyond MCP:** what would require bank records, internal correspondence, physical verification, or witness
-  interviews to establish.
+- **Beyond MCP:** what would require bank records, internal correspondence, physical verification, or witness interviews
+  to establish.
 
 ---
 
@@ -239,11 +239,11 @@ For each authority flagged by at least one theme file:
 
 ### <Authority name>
 
-**Contact:** <from theme file>
-**Triggered by themes:** <list>
-**Evidence basis:** <Tier 1 and Tier 2 items only — cite theme file and MCP tool/result>
-**Open questions for investigator:** <what is not yet established>
-**Attach:** <document types and MCP outputs to include>
+- **Contact:** <from theme file>
+- **Triggered by themes:** <list> 
+- **Evidence basis:** <Tier 1 and Tier 2 items only — cite theme file and MCP tool/result>
+- **Open questions for investigator:** <what is not yet established>
+- **Attach:** <document types and MCP outputs to include>
 
 > Clearly separate in any referral letter: (1) MCP analytical indicators with citations; (2) corroborating audit or
 > OSINT evidence; (3) unverified hypotheses requiring investigative powers.
@@ -265,7 +265,7 @@ For each authority flagged by at least one theme file:
 ### Required vocabulary (calibrated to evidence tier)
 
 | Situation         | Correct phrasing                                                                        |
-|-------------------|-----------------------------------------------------------------------------------------|
+| ----------------- | --------------------------------------------------------------------------------------- |
 | Tier 1 result     | "Tool X returned Y" / "Data shows Y" / "Query result: Y"                                |
 | Tier 2 pattern    | "Consistent with…" / "The data shows a pattern where…" / "Observed across N queries: …" |
 | Tier 3 hypothesis | "Hypothesis: …" (Unresolved Questions only)                                             |
