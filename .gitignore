@@ -2,3 +2,4 @@
 node_modules
 investigations/**
 .claude/_PROMPTS.md
+.archive
