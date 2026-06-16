@@ -21,9 +21,14 @@ This theme makes single-bidding a first-class indicator rather than a side-effec
 
 ## How bidder counts are obtained — read first
 
-There is **no queryable table or view of bidders or bid counts**. The number of bidders on a procurement is read **one
-procurement at a time** from its official **ATN-1 "Pirkimo procedūrų ataskaita"** XLSX (see the **Participant & bid
-data** section of the MCP index):
+There is **no queryable table or view of bidders or bid counts**.
+
+> **Update:** `v_dalyviai` now provides aggregate bidder counts in SQL for ~400 CVP IS procurements (Dec 2024 – Feb
+> 2026). Run the v_dalyviai query in the SQL Examples section first. For procurements not in `v_dalyviai`, use the ATN-1
+> file route below.
+
+The number of bidders on a procurement is read **one procurement at a time** from its official **ATN-1 "Pirkimo
+procedūrų ataskaita"** XLSX (see the **Participant & bid data** section of the MCP index):
 
 1. `get_viesasis_pirkimas(pirkimoId)` → find the ATN-1 file (filename starts `PPA-`, `ATN-`, or `Atn-1`, `xlsx`).
 2. `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` → **p.4 `VI. DALYVIAI (KANDIDATAI)`** lists every bidder with
@@ -70,6 +75,26 @@ These run against still-queryable views; they do **not** measure bidder counts (
 surface where to look.
 
 ```sql
+-- Single-bidder rate per buyer from parsed ATN-1 data (v_dalyviai, CVP IS only, ~400 procurements).
+-- Use this first; fall back to ATN-1 file reading for procurements not in v_dalyviai.
+WITH per_pirkimas AS (SELECT "pirkimoNumeris",
+                             "pirkejoKodas",
+                             COUNT(DISTINCT "tiekejoKodas") AS dalyviu
+                      FROM v_dalyviai
+                      GROUP BY "pirkimoNumeris", "pirkejoKodas")
+SELECT "pirkejoKodas",
+       COUNT(*)                                                          AS pirkimuKiekis,
+       COUNT(*) FILTER (WHERE dalyviu = 1)                              AS vienoDalyvioPirkimai,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE dalyviu = 1) / COUNT(*), 1) AS vienoDalyvioProcent,
+       ROUND(AVG(dalyviu), 1)                                           AS vidutinasDalyviu
+FROM per_pirkimas
+GROUP BY "pirkejoKodas"
+HAVING COUNT(*) >= 3
+ORDER BY vienoDalyvioProcent DESC
+LIMIT 30;
+```
+
+```sql
 -- Procedure mix per buyer: share of non-open / negotiated procedures (competition-bypass screen).
 -- High "uždaroProc" buyers are the ones whose individual procurements are worth opening for a bidder count.
 SELECT "jarKodas"                         AS pirkejoKodas,
@@ -80,6 +105,7 @@ SELECT "jarKodas"                         AS pirkejoKodas,
                  / COUNT(*), 1)           AS neAtviruProc
 FROM v_pirkimas
 WHERE "jarKodas" IS NOT NULL
+  AND "pirkimoBudas" IS NOT NULL
 GROUP BY "jarKodas"
 HAVING COUNT(*) >= 10
 ORDER BY neAtviruProc DESC, pirkimuKiekis DESC
@@ -111,10 +137,9 @@ Then, for the procurements behind the top rows, run `get_viesasis_pirkimas` → 
 
 **Gap (data):**
 
-- **Bidder counts are file-bound and CVP-IS-only.** They can be read only from new-CVP-IS ATN-1 reports, one procurement
-  at a time; old CVPP procurements have none, and there is no notice-level "tenders received" field. So single-bidding
-  cannot be computed as a market-wide rate — it is a per-procurement confirmation guided by a structural screen. A
-  notice-level bid-count field would let the strongest corruption proxy run across the whole market (candidate MCP
-  feature request, tracked in `TODO-domain.md`).
+- **Bidder counts are now partially queryable via `v_dalyviai`** for ~400 CVP IS procurements (Dec 2024 – Feb 2026,
+  growing). For the rest, they can be read only from new-CVP-IS ATN-1 reports, one procurement at a time; old CVPP
+  procurements have none. Single-bidding cannot yet be computed as a full market-wide rate — `v_dalyviai` coverage will
+  grow as more ATN-1 reports are ingested.
 - **Report what was checked.** In a referral, state which specific procurements were opened, how many bidders each had,
   and that single-bidding could not be assessed for procurements without an ATN-1 report.

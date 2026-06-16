@@ -14,8 +14,10 @@ first** mapping below:
 - Find companies by name or code → `search_juridiniai`
 - Find persons, emails, phones, IBANs in uploaded documents → `search_failai`
 - Find procurement notices → `search_viesieji_pirkimai`
-- Inspect who bid and at what price on a **specific** procurement → `get_viesasis_pirkimas` then `get_failas_tekstas` on
-  its ATN-1 file (see **Participant & bid data** below) — there is no SQL table for bidders/bid prices
+- Inspect who bid and at what price on a **specific** procurement → first check
+  `v_dalyviai WHERE "pirkimoNumeris" = '...'`; if not there, use `get_viesasis_pirkimas` then `get_failas_tekstas` on
+  its ATN-1 file (see **Participant & bid data** below)
+- Screen co-bidder pairs and bid-price patterns across many procurements → `v_dalyviai` (CVP IS only, ~400 procurements)
 - Aggregate, count, compute ratios, join tables → `execute_query`
 
 > **QUANTITATIVE CLAIMS RULE**: Any statement about totals, counts, value sums, market share, or trends **MUST** be
@@ -35,15 +37,25 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
   `pirkejoKodas`, `tiekejoKodas` (names resolved), `verte`, `faktineIvykdimoVerte` (actual executed value — populated
   for ~12% of contracts; enables cost-overrun analysis for themes 8, 18), `faktineIvykdimoData`, `sudarymoData`,
   `bvpzKodas`, `tipas`, `istrinta`, and consortia arrays `tiekejaiKodai[]` / `papildomiTiekejai[]`.
-- `v_pirkimas` [themes 5–7, 14, 20, 24]: notice-level view → `pirkimoId`, `organizatorius`, `miestas`, `trumpinys`,
-  `pirkimoBudas`, `statusas`, `numatomaVerteEUR`, `esFinansavimas` (bool), `bvpzKodai[]`, `paskelbimoData`,
-  `pasiulymuPateikimoTerminas`.
+- `v_pirkimas` [themes 5–7, 14, 20, 24, 28]: notice-level view combining CVP IS (`viesiejiPirkimai`, 45 949 records,
+  2022-09→today) and CVPP (`cvppViesiejiPirkimai`, 213 522 records, 2017-07→2024-12) → `pirkimoId`, `saltinis` ('cvpis'
+  / 'cvpp'), `organizatorius`, `miestas`, `trumpinys`, `pirkimoBudas`, `statusas`, `numatomaVerteEUR`, `esFinansavimas`
+  (bool), `bvpzKodai[]`, `paskelbimoData`, `pasiulymuPateikimoTerminas`. **CVPP records have NULL `pirkimoBudas`,
+  `numatomaVerteEUR`, `esFinansavimas`, `statusas`.** Add `WHERE "saltinis" = 'cvpis'` or
+  `WHERE "pirkimoBudas" IS NOT NULL` when procedure-type analysis is needed.
 - `v_person_links` [themes 4, 10–11, 13, 19, 21]: `pinregJuridiniaiRysiai` + `jarCsv` → `vardas`, `pavarde`, `jarKodas`,
   `imonesVardas`, `pareigos`, `rysioPradzia`, `rysioPabaiga` (date-filter to avoid stale links), `susijusioAsmensVardas`
   / `susijusioAsmensPavarde` (spouse/family link), `dalyvaujaViesuosePirkimuose` (bool), `registruotaLietuvoje`,
   `yraJuridinisAsmuo`.
 - `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosNumeris`, `bylosRusis`, `bylosData`,
   `teismas`, `bylojeKaip`, `dalyvioPavadinimas`, `dalyvioVardasIrPavarde`.
+- `v_dalyviai` [themes 2, 3, 14, 16, 17, 28]: parsed ATN-1 reports → `pirkimoNumeris`, `pirkejoKodas`, `pirkimoBudas`,
+  `tiekejoKodas`, `tiekejas`, `fizinisAsmuo`, `salis`, `daliesNumeris` (lot), `eileNumeris` (rank in bid ranking),
+  `pasiulymoKaina` (bid price), `atmetimoPriezastis` (rejection ground), `pretenzijaPateikta`, `ieskinysTeismui`,
+  `interesuKonfliktasNustatytas`, `konkurencijaIskreipiantisAsmuo`. **CVP IS only (~2022→today), ~400 procurements
+  currently (Dec 2024 – Feb 2026, growing).** Use for aggregate bidder counts, co-bidder screening, and bid price
+  analysis. When the target procurement is not in `v_dalyviai`, fall back to the per-procurement ATN-1 file route in the
+  **Participant & bid data** section.
 
 **Raw tables used directly** (no view wrapper exists or view would be counterproductive):
 
@@ -64,9 +76,13 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
 
 ### Participant & bid data — who bid and at what price (themes 2, 3, 14, 16, 17, 27, 28)
 
-Bidder lists and bid prices are **not** in any queryable table or view. They live inside the official **ATN-1 "Pirkimo
-procedūrų ataskaita"** XLSX attached to each procurement, and are read **one procurement at a time** — there is no SQL
-aggregate of bidder counts or bid prices:
+> **Check `v_dalyviai` first.** Bidder and bid-price data from parsed ATN-1 reports is now available in SQL for ~400 CVP
+> IS procurements (Dec 2024 – Feb 2026, growing). Query `v_dalyviai WHERE "pirkimoNumeris" = '...'` to get all bidders,
+> their prices, ranks, and rejection grounds without file reading. Use the per-procurement ATN-1 route below only when
+> the target procurement is not in `v_dalyviai`.
+
+For procurements not covered by `v_dalyviai`, bidder lists and bid prices live inside the official **ATN-1 "Pirkimo
+procedūrų ataskaita"** XLSX attached to each procurement, and are read **one procurement at a time**:
 
 1. `get_viesasis_pirkimas(pirkimoId)` → returns the procurement's `failai` list (plus content and buyer data).
 2. In that list find the ATN-1 report — filename begins **`PPA-`**, **`ATN-`**, or **`Atn-1`**, extension `xlsx`. Take
@@ -94,10 +110,11 @@ aggregate of bidder counts or bid prices:
 
 **Coverage (CVP IS vs CVPP):**
 
-| Source                                         | Records | Date range        | Participant / bid data |
-| ---------------------------------------------- | ------- | ----------------- | ---------------------- |
-| `cvppViesiejiPirkimai` (old CVPP)              | 257,556 | 2017-07 → 2024-12 | none                   |
-| `v_pirkimas` / `viesiejiPirkimai` (new CVP IS) | 44,466  | 2022-09 → today   | ATN-1 XLSX             |
+| Source                                           | Records   | Date range          | Participant / bid data          |
+| ------------------------------------------------ | --------- | ------------------- | ------------------------------- |
+| `cvppViesiejiPirkimai` (old CVPP)                | 213 522   | 2017-07 → 2024-12   | none                            |
+| `viesiejiPirkimai` (new CVP IS)                  | 45 949    | 2022-09 → today     | ATN-1 XLSX + `v_dalyviai`       |
+| `v_dalyviai` (parsed ATN-1 reports, CVP IS only) | ~400 proc | Dec 2024 – Feb 2026 | yes: bidder count, prices, rank |
 
 ### SABIS payment-flow analysis (themes 8, 18, 22, 25)
 

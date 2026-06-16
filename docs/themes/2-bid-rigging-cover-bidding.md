@@ -14,16 +14,17 @@ patterns suggesting coordination rather than genuine independent pricing.
 
 ## To Detect
 
-> **Note — bid prices are read per procurement, not queried.** Cover bidding needs the actual bids submitted on a
-> tender, and those live only in each procurement's ATN-1 report, read via `get_viesasis_pirkimas` →
-> `get_failas_tekstas` (see **Participant & bid data** in the MCP index). **p.7 (`VII.3` pasiūlymų eilė)** gives the
-> ranked bid list with **rank, bidder code, and price**; **p.6 (`VII.2`)** gives rejected/withdrawn bids. There is no
-> SQL aggregate of bids or co-bidder pairs across the market — co-bidding patterns are assembled by reading several
-> procurements' files. Only **new CVP IS** procurements (≈2022→today) have these files; **old CVPP** procurements have
-> no bid data (do not read absence as competition). **Bid suppression** (invited parties abstaining) still cannot be
-> detected — the report records submitted bids, not invitees; defer to theme 20. Before cover-bid analysis, screen with
-> **single-bidding — see [theme 28](28-single-bidding-competition-intensity.md)**: a tender that collapsed to one bidder
-> is the limiting case of suppressed competition.
+> **Bid prices are queryable in `v_dalyviai` for ~400 CVP IS procurements (Dec 2024 – Feb 2026, growing).** Run the SQL
+> below to screen co-bidder pairs and bid spreads in bulk, then open specific procurements' ATN-1 reports for detail.
+> For procurements not in `v_dalyviai`, bid prices live only in each procurement's ATN-1 report, read via
+> `get_viesasis_pirkimas` → `get_failas_tekstas` (see **Participant & bid data** in the MCP index). **p.7 (`VII.3`
+> pasiūlymų eilė)** gives the ranked bid list with **rank, bidder code, and price**; **p.6 (`VII.2`)** gives
+> rejected/withdrawn bids. Outside `v_dalyviai`'s ~400-procurement window, co-bidding patterns are assembled by reading
+> several procurements' files. Only **new CVP IS** procurements (≈2022→today) have these files; **old CVPP**
+> procurements have no bid data (do not read absence as competition). **Bid suppression** (invited parties abstaining)
+> still cannot be detected — the report records submitted bids, not invitees; defer to theme 20. Before cover-bid
+> analysis, screen with **single-bidding — see [theme 28](28-single-bidding-competition-intensity.md)**: a tender that
+> collapsed to one bidder is the limiting case of suppressed competition.
 
 - Losing bid clustering just above the winning price (small, consistent margins) — read from `VII.3` on the ATN-1 file.
 - Top co-bidder frequency (same losing bidders repeatedly present when a given winner wins) — assembled across several
@@ -35,11 +36,55 @@ patterns suggesting coordination rather than genuine independent pricing.
 
 ## Method — screen with SQL, confirm in the ATN-1 files
 
-There is no bid-level table to query. Use `v_sutartys` to find repeat buyer→supplier/co-supplier clusters worth
-inspecting, then open the candidate procurements' ATN-1 reports to examine the actual bids.
+There is no bid-level table to query for the full market. For the ~400 CVP IS procurements in `v_dalyviai`, co-bidder
+pairs and bid margins can be screened in SQL first. Use `v_sutartys` to find repeat buyer→supplier/co-supplier clusters
+worth inspecting, then open the candidate procurements' ATN-1 reports to examine the actual bids.
 
 ```sql
--- Stage 1: repeat winner concentration per buyer + CPV — shortlist tenders to open.
+-- Stage 1a: co-bidder pairs recurring across procurements (v_dalyviai, CVP IS only).
+-- Recurring presence of the same pair — one always winning, the other always losing — is the cover-bid signature.
+SELECT d1."tiekejoKodas"                   AS kodas1,
+       MAX(d1.tiekejas)                     AS tiekejas1,
+       d2."tiekejoKodas"                   AS kodas2,
+       MAX(d2.tiekejas)                     AS tiekejas2,
+       COUNT(DISTINCT d1."pirkimoNumeris") AS bendriPirkimai
+FROM v_dalyviai d1
+         JOIN v_dalyviai d2
+              ON d2."pirkimoNumeris" = d1."pirkimoNumeris"
+                  AND d2."tiekejoKodas" > d1."tiekejoKodas"
+GROUP BY d1."tiekejoKodas", d2."tiekejoKodas"
+HAVING COUNT(DISTINCT d1."pirkimoNumeris") >= 2
+ORDER BY bendriPirkimai DESC
+LIMIT 30;
+```
+
+```sql
+-- Stage 1b: bid spread from v_dalyviai — tenders where rank-2 bid is within 5 % of rank-1 (cover-bid margin).
+-- Single-part lots only (daliesNumeris IS NULL); requires at least 2 ranked bids with known prices.
+SELECT d."pirkimoNumeris",
+       COUNT(DISTINCT d."tiekejoKodas")                                                        AS dalyviu,
+       r.laimejasKaina,
+       r.antrasKaina,
+       ROUND((r.antrasKaina - r.laimejasKaina) / NULLIF(r.laimejasKaina, 0) * 100, 2)         AS skirtumoProcent
+FROM v_dalyviai d
+         JOIN (SELECT "pirkimoNumeris",
+                      MIN("pasiulymoKaina") FILTER (WHERE "eileNumeris" = 1) AS laimejasKaina,
+                      MIN("pasiulymoKaina") FILTER (WHERE "eileNumeris" = 2) AS antrasKaina
+               FROM v_dalyviai
+               WHERE "eileNumeris" IS NOT NULL
+                 AND "pasiulymoKaina" IS NOT NULL
+                 AND "daliesNumeris" IS NULL
+               GROUP BY "pirkimoNumeris") r ON r."pirkimoNumeris" = d."pirkimoNumeris"
+WHERE r.laimejasKaina IS NOT NULL AND r.antrasKaina IS NOT NULL
+GROUP BY d."pirkimoNumeris", r.laimejasKaina, r.antrasKaina
+HAVING COUNT(DISTINCT d."tiekejoKodas") >= 2
+   AND (r.antrasKaina - r.laimejasKaina) / NULLIF(r.laimejasKaina, 0) BETWEEN 0 AND 0.05
+ORDER BY skirtumoProcent ASC
+LIMIT 30;
+```
+
+```sql
+-- Stage 1c: repeat winner concentration per buyer + CPV — shortlist tenders to open.
 -- A supplier winning the same buyer's CPV repeatedly is where designated-winner / cover-bid patterns hide.
 SELECT s."pirkejoKodas",
        MAX(s.pirkejas)            AS pirkejas,

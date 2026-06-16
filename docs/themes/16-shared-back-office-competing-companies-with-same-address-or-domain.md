@@ -63,8 +63,17 @@ ORDER BY d1.domain
 LIMIT 50;
 ```
 
-**Confirm co-bidding (per procurement).** For a shared-infrastructure pair, find tenders both bid in: use
-`search_sutartys` / `v_sutartys` to find procurements where each is a supplier, then for the overlapping procurements
-run `get_viesasis_pirkimas` → `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` and check whether **both codes appear
-in `VI. DALYVIAI`** of the same tender. Two ostensibly independent firms sharing an address/domain and bidding against
-each other is the core red flag — record the procurement ID and both codes.
+**Confirm co-bidding.** First query `v_dalyviai` for both codes:
+
+```sql
+-- Co-bidding confirmation from v_dalyviai (CVP IS procurements, ~400 available).
+SELECT "pirkimoNumeris", "tiekejoKodas", tiekejas, "eileNumeris", "pasiulymoKaina"
+FROM v_dalyviai
+WHERE "tiekejoKodas" IN ('<kodas1>', '<kodas2>')
+ORDER BY "pirkimoNumeris", "eileNumeris";
+```
+
+Procurements where both codes appear are confirmed co-bids. For procurements not in `v_dalyviai`, run
+`get_viesasis_pirkimas` → `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` and check whether **both codes appear in
+`VI. DALYVIAI`** of the same tender. Two ostensibly independent firms sharing an address/domain and bidding against each
+other is the core red flag — record the procurement ID and both codes.

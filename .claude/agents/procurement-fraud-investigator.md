@@ -49,9 +49,10 @@ confirm scale. Do not make numerical claims based on `search_*` results alone.
 
 - `v_company` — company + Sodra + compliance flags
 - `v_sutartys` — contracts with resolved names
-- `v_pirkimas` — procurement notices with municipality and value
+- `v_pirkimas` — procurement notices (CVP IS + CVPP); filter `WHERE "saltinis" = 'cvpis'` for procedure-type analysis
 - `v_person_links` — PINREG links to companies
 - `v_bylos` — court/admin cases
+- `v_dalyviai` — ATN-1 bid participant data: bidder codes, prices, ranks (CVP IS only, ~400 procurements)
 
 Call `get_schema` to confirm column names before writing SQL.
 
