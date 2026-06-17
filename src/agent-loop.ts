@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import * as readline from "readline";
-import { log } from "./io/logger.js";
+import { log, logTool } from "./io/logger.js";
 
 const MCP_TOOLS = [
   "mcp__viespirkiai-local__execute_query",
@@ -76,7 +76,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
   args.push(userMessage);
 
-  log(`  [${agentName}] starting (model=${model}, mcp=${enableMcp})`);
+  log(`  🟢 ${agentName} starting...`);
 
   return new Promise<AgentResult>((resolve, reject) => {
     const proc = spawn("claude", args, {
@@ -99,7 +99,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (!line.trim()) return;
       try {
         const msg = JSON.parse(line);
-        logMessage(msg, agentName);
+        logToolCall(msg, cwd);
 
         if (msg.type === "result") {
           if (msg.subtype === "success") {
@@ -134,9 +134,6 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         return;
       }
 
-      log(
-        `  [${agentName}] done (${numTurns} turns, $${costUsd.toFixed(4)}, ${(durationMs / 1000).toFixed(0)}s)`,
-      );
       resolve({ text: finalResult, costUsd, durationMs, numTurns, sessionId });
     });
 
@@ -146,29 +143,79 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   });
 }
 
-function logMessage(msg: any, agentName: string): void {
-  if (msg.type === "assistant" && msg.message?.content) {
-    for (const block of msg.message.content) {
-      if (block.type === "tool_use") {
-        const name = block.name ?? "unknown";
-        const shortName = name.replace("mcp__viespirkiai-local__", "");
-        const argStr = summarizeArgs(block.input ?? {});
-        log(`  [${agentName}] ${shortName}(${argStr})`);
-      }
-    }
+function logToolCall(msg: any, cwd: string): void {
+  if (msg.type !== "assistant" || !msg.message?.content) return;
+  for (const block of msg.message.content) {
+    if (block.type !== "tool_use") continue;
+    const name = block.name ?? "unknown";
+    const input = block.input ?? {};
+    const short = formatShort(name, input, cwd);
+    const verbose = formatVerbose(name, input, cwd);
+    logTool(`     ${short}`, verbose);
   }
 }
 
-function summarizeArgs(args: Record<string, unknown>): string {
-  const parts: string[] = [];
-  for (const [k, v] of Object.entries(args)) {
-    if (typeof v === "string" && v.length > 80) {
-      parts.push(`${k}="${v.slice(0, 77)}..."`);
-    } else if (typeof v === "string") {
-      parts.push(`${k}="${v}"`);
-    } else {
-      parts.push(`${k}=${JSON.stringify(v)}`);
-    }
+function formatShort(name: string, input: Record<string, unknown>, cwd: string): string {
+  if (name === "Read") return `📖 Read ${shortenPath(input.file_path as string, cwd)}`;
+  if (name === "Write") return `📝 Write ${shortenPath(input.file_path as string, cwd)}`;
+  if (name === "Edit") return `✏️  Edit ${shortenPath(input.file_path as string, cwd)}`;
+
+  const tool = name.replace("mcp__viespirkiai-local__", "");
+
+  if (tool === "execute_query") {
+    const sql = normalize((input.query as string) || "");
+    if (!sql) return `🔍 execute_query`;
+    return `🔍 execute_query: ${truncate(sql, 60)}`;
   }
-  return parts.join(", ");
+  if (tool === "get_schema") {
+    const table = input.table as string;
+    return table ? `📋 get_schema(${table})` : `📋 get_schema`;
+  }
+
+  const args = briefArgs(input);
+  if (tool.startsWith("search_")) return args ? `🔍 ${tool}(${args})` : `🔍 ${tool}`;
+  if (tool.startsWith("get_")) return args ? `📥 ${tool}(${args})` : `📥 ${tool}`;
+  return args ? `⚙️  ${tool}(${args})` : `⚙️  ${tool}`;
+}
+
+function formatVerbose(name: string, input: Record<string, unknown>, cwd: string): string {
+  const tool = name.replace("mcp__viespirkiai-local__", "");
+  const args = Object.entries(input)
+    .filter(([k]) => k !== "content" && k !== "old_string" && k !== "new_string")
+    .map(([k, v]) => {
+      const val = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : JSON.stringify(v);
+      return `${k}=${truncate(val, 200)}`;
+    })
+    .join(", ");
+
+  if (name === "Read" || name === "Write" || name === "Edit") {
+    return `${name} ${shortenPath(input.file_path as string, cwd)}`;
+  }
+  return args ? `${tool}(${args})` : tool;
+}
+
+function briefArgs(input: Record<string, unknown>): string {
+  return Object.entries(input)
+    .filter(([k]) => k !== "content" && k !== "old_string" && k !== "new_string" && k !== "purpose")
+    .map(([k, v]) => {
+      if (typeof v === "string") return `${k}=${truncate(v, 25)}`;
+      return `${k}=${JSON.stringify(v)}`;
+    })
+    .join(", ");
+}
+
+function shortenPath(filePath: string | undefined, cwd: string): string {
+  if (!filePath) return "?";
+  if (filePath.startsWith(cwd + "/")) return filePath.slice(cwd.length + 1);
+  const parts = filePath.split("/");
+  if (parts.length <= 3) return filePath;
+  return parts.slice(-3).join("/");
+}
+
+function normalize(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }

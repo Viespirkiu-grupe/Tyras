@@ -22,51 +22,46 @@ export async function investigate(caseId: string): Promise<void> {
   const caseDir = await workspace.createWorkspace(caseId);
   const caseMd = workspace.caseMdPath(caseDir);
 
-  // State 1: no case.md — create template and exit
   if (!(await workspace.fileExists(caseMd))) {
     await workspace.writeFile(caseMd, CASE_MD_TEMPLATE);
-    console.log(`Created: ${caseMd}`);
-    console.log(`Write your case description in this file, then run again:`);
-    console.log(`  npm run investigate ${caseId}`);
+    console.log(`\n  📂 Created: ${caseMd}`);
+    console.log(`  ✏️  Write your case description in this file, then run again:`);
+    console.log(`     npm run investigate ${caseId}\n`);
     return;
   }
 
   const casePrompt = await workspace.readFile(caseMd);
-
-  // State 2/3: case.md exists — check for saved state
   const saved = (await workspace.loadState(caseDir)) as InvestigationState | null;
 
   if (saved) {
-    // State 3: resume
     initLogger(caseDir);
-    log("=== Tyras Investigation Orchestrator (resuming) ===\n");
-    log(`Model:    ${CONFIG.model}`);
-    log(`Budget:   $${CONFIG.maxBudgetPerStep}/step`);
-    log(`Parallel: ${CONFIG.parallelThemes}`);
-    log(`Case:     ${caseId}`);
-    log(`Status:   ${saved.status}, ${saved.completedThemes.length} themes done\n`);
+    log("");
+    log("🚀 Tyras Investigation Orchestrator (resuming)");
+    log(`   Model: ${CONFIG.model}  Budget: $${CONFIG.maxBudgetPerStep}/step  Parallel: ${CONFIG.parallelThemes}`);
+    log(`   Case:  ${caseId}`);
+    log(`   Status: ${saved.status}, ${saved.completedThemes.length} themes done`);
+    log("");
     await runPipeline(caseId, caseDir, casePrompt, saved);
     return;
   }
 
-  // State 2: new investigation — confirm with user
-  console.log(`\n--- Case: ${caseId} ---\n`);
+  console.log(`\n  📋 Case: ${caseId}\n`);
   console.log(casePrompt.trim());
   console.log();
 
-  const confirmed = await confirm("Start investigation?");
+  const confirmed = await confirm("  Start investigation?");
   if (!confirmed) {
-    console.log("Aborted. Edit case.md and run again.");
+    console.log("  Aborted. Edit case.md and run again.\n");
     return;
   }
 
   initLogger(caseDir);
-  log("=== Tyras Investigation Orchestrator ===\n");
-  log(`Model:    ${CONFIG.model}`);
-  log(`Budget:   $${CONFIG.maxBudgetPerStep}/step`);
-  log(`Parallel: ${CONFIG.parallelThemes}`);
-  log(`Case:     ${caseId}`);
-  log(`Dir:      ${caseDir}/\n`);
+  log("");
+  log("🚀 Tyras Investigation Orchestrator");
+  log(`   Model: ${CONFIG.model}  Budget: $${CONFIG.maxBudgetPerStep}/step  Parallel: ${CONFIG.parallelThemes}`);
+  log(`   Case:  ${caseId}`);
+  log(`   Dir:   ${caseDir}/`);
+  log("");
 
   const state: InvestigationState = {
     caseId,
@@ -87,10 +82,10 @@ async function runPipeline(
   casePrompt: string,
   state: InvestigationState,
 ): Promise<void> {
-  // Phase 1: Planning
   let plan: PlannerHandoff;
   if (state.status === "planning") {
-    log("--- Phase 1: Planning ---\n");
+    log("📋 Phase 1: Planning");
+    log("");
     const { handoff, step } = await withRetry("planner", () =>
       runPlanner(casePrompt, caseId, CONFIG.model, CONFIG.maxBudgetPerStep),
     );
@@ -99,15 +94,21 @@ async function runPipeline(
     state.status = "investigating";
     recordStep(state, step);
     await workspace.saveState(caseDir, state);
-    log(`\nPlan: ${plan.themes.length} themes selected\n`);
+    log("");
+    log(`   📌 Plan: ${plan.themes.length} themes selected`);
+    for (const t of plan.themes) {
+      log(`      ${t.index}. ${t.name} [${t.priority}]`);
+    }
+    log("");
   } else {
     plan = state.plan!;
-    log(`Plan loaded: ${plan.themes.length} themes, ${state.completedThemes.length} done\n`);
+    log(`   📌 Plan loaded: ${plan.themes.length} themes, ${state.completedThemes.length} done`);
+    log("");
   }
 
-  // Phase 2: Investigation
   if (state.status === "investigating") {
-    log("--- Phase 2: Investigation ---\n");
+    log("🔎 Phase 2: Investigation");
+    log("");
     const pendingThemes = plan.themes.filter((t) => !state.completedThemes.includes(t.index));
 
     if (CONFIG.parallelThemes) {
@@ -118,29 +119,31 @@ async function runPipeline(
 
     state.status = "reporting";
     await workspace.saveState(caseDir, state);
-    log("\nAll themes complete\n");
+    log("");
   }
 
-  // Phase 3: Report
   if (state.status === "reporting") {
-    log("--- Phase 3: Report ---\n");
+    log("📊 Phase 3: Report");
+    log("");
     const { step } = await withRetry("reporter", () =>
       runReporter(caseId, caseDir, CONFIG.model, CONFIG.maxBudgetPerStep),
     );
     recordStep(state, step);
     state.status = "tech-review";
     await workspace.saveState(caseDir, state);
+    log("");
   }
 
-  // Phase 4: Tech Review
   if (state.status === "tech-review") {
-    log("--- Phase 4: Tech Review ---\n");
+    log("🔧 Phase 4: Tech Review");
+    log("");
     const { step } = await withRetry("tech-reviewer", () =>
       runTechReviewer(caseId, caseDir, CONFIG.model, CONFIG.maxBudgetPerStep),
     );
     recordStep(state, step);
     state.status = "complete";
     await workspace.saveState(caseDir, state);
+    log("");
   }
 
   printSummary(state);
@@ -155,7 +158,7 @@ async function runThemesSequential(
     const theme = themes[i];
     const nextThemeIndex = i + 1 < themes.length ? themes[i + 1].index : 0;
 
-    log(`  Theme ${theme.index}/${plan.themes.length}: ${theme.name} [${theme.priority}]`);
+    log(`  📌 Theme ${theme.index}/${plan.themes.length}: ${theme.name} [${theme.priority}]`);
 
     const inputs: InvestigatorInputs = {
       caseId: state.caseId,
@@ -175,6 +178,7 @@ async function runThemesSequential(
     recordStep(state, step);
     state.completedThemes.push(theme.index);
     await workspace.saveState(state.caseDir, state);
+    log("");
   }
 }
 
@@ -186,7 +190,7 @@ async function runThemesParallel(
   const [first, ...rest] = themes;
 
   if (first) {
-    log(`  Theme ${first.index}: ${first.name} [sequential baseline]`);
+    log(`  📌 Theme ${first.index}: ${first.name} [sequential baseline]`);
     const inputs: InvestigatorInputs = {
       caseId: state.caseId,
       caseDir: state.caseDir,
@@ -204,12 +208,13 @@ async function runThemesParallel(
     recordStep(state, step);
     state.completedThemes.push(first.index);
     await workspace.saveState(state.caseDir, state);
+    log("");
   }
 
   const BATCH_SIZE = 3;
   for (let batchStart = 0; batchStart < rest.length; batchStart += BATCH_SIZE) {
     const batch = rest.slice(batchStart, batchStart + BATCH_SIZE);
-    log(`\n  Parallel batch: themes ${batch.map((t) => t.index).join(", ")}`);
+    log(`  ⚡ Parallel batch: themes ${batch.map((t) => t.index).join(", ")}`);
 
     const results = await Promise.allSettled(
       batch.map((theme, i) => {
@@ -248,10 +253,10 @@ async function runThemesParallel(
           numTurns: 0,
         };
         recordStep(state, failStep);
-        log(`  Theme ${batch[i].index} FAILED: ${failStep.error}`);
       }
     }
     await workspace.saveState(state.caseDir, state);
+    log("");
   }
 }
 
@@ -264,8 +269,8 @@ async function withRetry<T>(name: string, fn: () => Promise<T>): Promise<T> {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < CONFIG.maxRetries) {
         const delay = Math.min(30_000 * Math.pow(2, attempt - 1), 120_000);
-        warn(`  [${name}] attempt ${attempt} failed: ${lastError.message}`);
-        warn(`  [${name}] retrying in ${delay / 1000}s...`);
+        warn(`  ⚠️  [${name}] attempt ${attempt} failed: ${lastError.message}`);
+        warn(`  ⏳ retrying in ${delay / 1000}s...`);
         await sleep(delay);
       }
     }
@@ -277,32 +282,42 @@ function recordStep(state: InvestigationState, step: StepResult): void {
   state.steps.push(step);
   state.totalCostUsd += step.costUsd;
 
-  const min = (step.durationMs / 60_000).toFixed(1);
-  const status = step.success ? "OK" : "FAILED";
-  log(
-    `  ${step.stepName}: ${status} (${min}min, $${step.costUsd.toFixed(4)}, ${step.numTurns} turns)`,
-  );
+  const dur = formatDuration(step.durationMs);
+  if (step.success) {
+    log(`  ✅ ${step.stepName} — ${dur}, $${step.costUsd.toFixed(4)}, ${step.numTurns} turns`);
+  } else {
+    log(`  ❌ ${step.stepName} — FAILED: ${step.error}`);
+  }
 }
 
 function printSummary(state: InvestigationState): void {
   const totalMs = Date.now() - state.startTime;
-  const totalMin = (totalMs / 60_000).toFixed(1);
 
-  log("\n=== Investigation Complete ===\n");
-  log(`Case:     ${state.caseId}`);
-  log(`Status:   ${state.status}`);
-  log(`Duration: ${totalMin} minutes`);
-  log(`Cost:     $${state.totalCostUsd.toFixed(4)}`);
-  log(`Steps:    ${state.steps.length}`);
-  log(`Report:   ${state.caseDir}/report.md`);
-
-  log("\nPer-step breakdown:");
+  log("═══════════════════════════════════════════════");
+  log("✅ Investigation Complete");
+  log("");
+  log(`   Case:     ${state.caseId}`);
+  log(`   Duration: ${formatDuration(totalMs)}`);
+  log(`   Cost:     $${state.totalCostUsd.toFixed(4)}`);
+  log(`   Steps:    ${state.steps.length}`);
+  log(`   Report:   ${state.caseDir}/report.md`);
+  log("");
+  log("   Step Breakdown:");
+  log("   ─────────────────────────────────────────────");
   for (const step of state.steps) {
-    const min = (step.durationMs / 60_000).toFixed(1);
-    log(
-      `  ${step.stepName.padEnd(40)} ${min.padStart(6)}min  $${step.costUsd.toFixed(4).padStart(8)}  ${step.numTurns} turns`,
-    );
+    const icon = step.success ? "✅" : "❌";
+    const dur = formatDuration(step.durationMs).padStart(6);
+    log(`   ${icon} ${step.stepName.padEnd(35)} ${dur}  $${step.costUsd.toFixed(4).padStart(8)}  ${step.numTurns} turns`);
   }
+  log("═══════════════════════════════════════════════");
+}
+
+function formatDuration(ms: number): string {
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  return `${min}m${remSec}s`;
 }
 
 async function confirm(message: string): Promise<boolean> {
