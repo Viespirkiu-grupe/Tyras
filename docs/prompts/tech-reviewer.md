@@ -1,4 +1,4 @@
-Aggregate claims in tech-report.md in {state.caseDir} and organize them in structure.
+Aggregate claims in tech-report.md in {{CASE_DIR}} and organize them in structure.
 Later on tech report will be used to raise bug reports and fix them.
 Do not lose important information while organizing the structure.
 Write down tech-report-summary.md
