@@ -35,6 +35,7 @@ export interface TokenUsage {
 export interface StepResult {
   stepName: string;
   durationMs: number;
+  duration: string;
   costUsd: number;
   success: boolean;
   error?: string;
@@ -51,4 +52,5 @@ export interface InvestigationState {
   steps: StepResult[];
   totalCostUsd: number;
   startTime: number;
+  startDateTime: string;
 }

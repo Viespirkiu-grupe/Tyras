@@ -1,4 +1,5 @@
 import { runAgent } from "../agent-loop.js";
+import { formatDuration } from "../io/format.js";
 import { loadPrompt } from "../io/loader.js";
 import type { InvestigatorInputs, StepResult } from "../types.js";
 
@@ -33,6 +34,7 @@ Start by reading the dossier, then any prior theme findings files in the investi
   const step: StepResult = {
     stepName: `theme-${String(inputs.themeIndex).padStart(2, "0")}-${inputs.themeName}`,
     durationMs: result.durationMs,
+    duration: formatDuration(result.durationMs),
     costUsd: result.costUsd,
     success: true,
     retries: 0,

@@ -1,4 +1,5 @@
 import { runAgent } from "../agent-loop.js";
+import { formatDuration } from "../io/format.js";
 import { loadPrompt } from "../io/loader.js";
 import type { StepResult } from "../types.js";
 import { readFile, fileExists } from "../io/workspace.js";
@@ -37,6 +38,7 @@ ${techReport || "No tech report found — write a summary noting that no technic
   const step: StepResult = {
     stepName: "tech-reviewer",
     durationMs: result.durationMs,
+    duration: formatDuration(result.durationMs),
     costUsd: result.costUsd,
     success: true,
     retries: 0,

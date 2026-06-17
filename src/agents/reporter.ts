@@ -1,4 +1,5 @@
 import { runAgent } from "../agent-loop.js";
+import { formatDuration } from "../io/format.js";
 import { loadPrompt } from "../io/loader.js";
 import type { StepResult } from "../types.js";
 import { listThemeFiles } from "../io/workspace.js";
@@ -43,6 +44,7 @@ This ensures partial progress is saved even if something fails mid-way.`;
   const step: StepResult = {
     stepName: "reporter",
     durationMs: result.durationMs,
+    duration: formatDuration(result.durationMs),
     costUsd: result.costUsd,
     success: true,
     retries: 0,

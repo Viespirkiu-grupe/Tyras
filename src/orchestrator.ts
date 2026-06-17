@@ -6,6 +6,7 @@ import { runTechReviewer } from "./agents/tech-reviewer.js";
 import * as workspace from "./io/workspace.js";
 import { initLogger, log, warn } from "./io/logger.js";
 import { CONFIG } from "./config.js";
+import { formatDuration, formatDateTime } from "./io/format.js";
 import type { InvestigationState, InvestigatorInputs, StepResult, PlannerHandoff } from "./types.js";
 
 const CASE_MD_TEMPLATE = `# Case Description
@@ -71,6 +72,7 @@ export async function investigate(caseId: string): Promise<void> {
     steps: [],
     totalCostUsd: 0,
     startTime: Date.now(),
+    startDateTime: formatDateTime(new Date()),
   };
 
   await runPipeline(caseId, caseDir, casePrompt, state);
@@ -246,6 +248,7 @@ async function runThemesParallel(
         const failStep: StepResult = {
           stepName: `theme-${String(batch[i].index).padStart(2, "0")}-${batch[i].name}`,
           durationMs: 0,
+          duration: "0s",
           costUsd: 0,
           success: false,
           error: r.reason?.message || String(r.reason),
@@ -310,14 +313,6 @@ function printSummary(state: InvestigationState): void {
     log(`   ${icon} ${step.stepName.padEnd(35)} ${dur}  $${step.costUsd.toFixed(4).padStart(8)}  ${step.numTurns} turns`);
   }
   log("═══════════════════════════════════════════════");
-}
-
-function formatDuration(ms: number): string {
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  const remSec = sec % 60;
-  return `${min}m${remSec}s`;
 }
 
 async function confirm(message: string): Promise<boolean> {

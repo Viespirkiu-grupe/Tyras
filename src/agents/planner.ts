@@ -1,4 +1,5 @@
 import { runAgent } from "../agent-loop.js";
+import { formatDuration } from "../io/format.js";
 import { loadPrompt } from "../io/loader.js";
 import type { PlannerHandoff, StepResult } from "../types.js";
 
@@ -34,6 +35,7 @@ Begin by reading the theme index at docs/index/mcp-investigator-prompt.md, then 
   const step: StepResult = {
     stepName: "planner",
     durationMs: result.durationMs,
+    duration: formatDuration(result.durationMs),
     costUsd: result.costUsd,
     success: true,
     retries: 0,
