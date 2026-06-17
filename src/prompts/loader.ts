@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
+// @TODO: move this to io/ fodler
 const promptDir = join(dirname(fileURLToPath(import.meta.url)));
 
 export function loadPrompt(name: string): string {

@@ -64,6 +64,7 @@ function getFlagValue(args: string[], flag: string): string | undefined {
 }
 
 function printUsage() {
+  // @TODO: move message to constants or somewhere from the code to do not bloat it
   console.log(`
 Tyras — Lithuanian Public Procurement Fraud Investigation Pipeline
 

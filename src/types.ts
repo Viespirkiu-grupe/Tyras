@@ -42,6 +42,7 @@ export interface StepResult {
   numTurns: number;
 }
 
+// @TODO: investigation state must be stored when updated to resume from the hard fail. You can store it in investigations/<investigation>/investigation-state.json if that makes sense, or decide better
 export interface InvestigationState {
   caseId: string;
   caseDir: string;
@@ -52,3 +53,7 @@ export interface InvestigationState {
   totalCostUsd: number;
   startTime: number;
 }
+
+// @TODO:
+//  I just added tech-reviewer.md that is the very final agent that summerizes tech report - this agent does not need any context - just tech report!
+//  Maybe you can even pass it to promot to save agent back and forth reading call? Do what is the best

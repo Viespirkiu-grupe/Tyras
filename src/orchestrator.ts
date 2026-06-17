@@ -5,6 +5,9 @@ import * as workspace from "./io/workspace.js";
 import { CONFIG } from "./config.js";
 import type { InvestigationState, InvestigatorInputs, StepResult, PlannerHandoff } from "./types.js";
 
+// @TODO: in general, all logs must be written in file with timestamps - you can use simple but good logging library if needed or build log commands by yourself
+// @TODO: logs are printed in log file as well as in console in investigations/<investigation>/investigation.log
+
 export interface InvestigateOptions {
   casePrompt: string;
   caseId?: string;
@@ -232,6 +235,7 @@ function printSummary(state: InvestigationState): void {
   const totalMs = Date.now() - state.startTime;
   const totalMin = (totalMs / 60_000).toFixed(1);
 
+  // @TODO: this must be written in investigation.log - log file must be always appended.
   console.log("\n=== Investigation Complete ===\n");
   console.log(`Case:     ${state.caseId}`);
   console.log(`Status:   ${state.status}`);

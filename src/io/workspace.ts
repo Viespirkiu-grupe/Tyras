@@ -3,6 +3,7 @@ import * as path from "path";
 
 const INVESTIGATIONS_DIR = "investigations";
 
+// @TODO: format must be date + keyword. For example: 20260517_kelme - agent will tell you keyword, just ask, it must be no more than 20 symbols, better a single or two words in Latin, lowercased, joined by underscore _
 export async function generateCaseId(): Promise<string> {
   const year = new Date().getFullYear();
   try {
