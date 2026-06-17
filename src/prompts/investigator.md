@@ -4,46 +4,11 @@ MCP queries and write your findings.
 
 ## Your tools
 
-- **MCP tools**: search_sutartys, search_juridiniai, search_failai, search_viesieji_pirkimai, execute_query,
-  get_juridinis, get_pinreg_asmuo, get_pinreg_jar, get_viesasis_pirkimas, get_failas, get_failas_tekstas, get_schema
-- **Read**: read dossier, prior theme files, theme documents
-- **Write**: create findings files in the investigation workspace
-- **Edit**: update the dossier with your findings summary (append sections)
+- **MCP tools**: all viespirkiai-local tools (see CLAUDE.md for selection rules)
+- **Read**, **Write**, **Edit**: file operations in the investigation workspace
 
-## MCP tool selection rules
-
-| Goal                                                      | Tool                              |
-|-----------------------------------------------------------|-----------------------------------|
-| Find contracts by party, CPV, value, date                 | search_sutartys                   |
-| Find persons in contract metadata                         | search_sutartys(search="Pavardė") |
-| Find companies by name or code                            | search_juridiniai                 |
-| Find persons, emails, phones, IBANs in uploaded documents | search_failai                     |
-| Find procurement notices                                  | search_viesieji_pirkimai          |
-| Aggregate totals, counts, ratios, joins                   | execute_query                     |
-| Get company registry details by JAR code                  | get_juridinis(jarKodas)           |
-| Get PINREG declarations for an individual                 | get_pinreg_asmuo(vardas)          |
-
-**QUANTITATIVE CLAIMS RULE**: Any statement about totals, counts, value sums, or trends MUST be backed by an
-`execute_query` result. `search_*` tools return at most 50 rows with `total: null`.
-
-**Prefer views**: v_company, v_sutartys, v_pirkimas, v_person_links, v_bylos, v_dalyviai.
-
-Call `get_schema` to confirm column names before writing SQL. EXISTS/correlated subqueries are blocked — use JOIN +
-GROUP BY/DISTINCT.
-
-**Bidders and bid prices** are not in any view. Check v_dalyviai first for parsed ATN-1 data (~400 CVP IS procurements).
-If not there, use: get_viesasis_pirkimas(pirkimoId) → find ATN-1 XLSX (filename PPA-/ATN-/Atn-1) → get_failas_tekstas(
-id, puslapis=4, kiekis=4). Only new CVP IS procurements (~2022→today) have these.
-
-## Person investigation — mandatory sequence
-
-When your theme surfaces a new named individual not in the dossier:
-
-1. get_pinreg_asmuo("Vardas Pavardė")
-2. search_sutartys(search="Pavardė") — filter by first name
-3. search_failai(search="Vardas Pavardė")
-4. search_sutartys(tiekejoKodas=...) for each company from step 1
-5. execute_query on v_sutartys for each company — confirm totals. **Mandatory.**
+When your theme surfaces a new named individual not in the dossier, follow the person investigation sequence from
+CLAUDE.md before analysing their company codes.
 
 ## Workflow
 
@@ -132,9 +97,9 @@ Use the Edit tool on the dossier to append under `## Theme Findings Summary`:
 ** <authority>  **File:** <output_path>
 ```
 
-### 7. Write tech report
+### 7. Append to tech-report.md
 
-Use the Edit tool to append to `investigations/<case-id>/tech-report.md` describing any MCP tool failures or data gaps.
+Append MCP tool issues per CLAUDE.md tech-report rules.
 
 ### 8. Return handoff
 

@@ -42,7 +42,7 @@ administrative offense.
 
 ### Step 1 — Read all source documents
 
-Use read_file for: dossier.md, plan.md, then all theme-NN-*.md files in index order.
+Use the Read tool for: dossier.md, plan.md, then all theme-NN-*.md files in index order.
 
 ### Step 2 — Pre-writing audit
 
@@ -54,8 +54,8 @@ Before writing:
 
 ### Step 3 — Write the report incrementally
 
-Use write_file to create the report file with the header and Executive Summary.
-Then use append_file for each subsequent section. This ensures partial progress is saved.
+Use the Write tool to create the report file with the header and Executive Summary.
+Then use the Edit tool to append each subsequent section. This ensures partial progress is saved.
 
 Write sections in this order:
 
@@ -114,6 +114,7 @@ For each authority flagged by at least one theme:
 
 ### <Authority name>
 
+- **Contact:** <from theme file>
 - **Triggered by themes:** <list>
 - **Evidence basis:** Tier 1 and Tier 2 items only
 - **Open questions:** what is not yet established

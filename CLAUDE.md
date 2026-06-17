@@ -1,11 +1,30 @@
 ## MCP tool rules (enforced across all agents)
 
-- **Discovery**: use `search_sutartys`, `search_juridiniai`, `search_failai`, `search_viesieji_pirkimai`
-- **Aggregations and scale confirmation**: use `execute_query` with views (`v_sutartys`, `v_company`, `v_pirkimas`,
-  `v_person_links`, `v_bylos`)
+### Tool selection
+
+| Goal                                                            | Tool                                |
+| --------------------------------------------------------------- | ----------------------------------- |
+| Find contracts by party, CPV, value, date                       | `search_sutartys`                   |
+| Find persons in contract metadata (signatories, counterparties) | `search_sutartys(search="Pavardė")` |
+| Find companies by name or code                                  | `search_juridiniai`                 |
+| Find persons, emails, phones, IBANs in uploaded documents       | `search_failai`                     |
+| Find procurement notices                                        | `search_viesieji_pirkimai`          |
+| Aggregate totals, counts, ratios, joins                         | `execute_query`                     |
+| Get company registry details by JAR code                        | `get_juridinis(jarKodas)`           |
+| Get PINREG declarations for an individual                       | `get_pinreg_asmuo(vardas)`          |
+
+### Rules
+
 - **QUANTITATIVE CLAIMS RULE**: any count, total, or ratio must be backed by an `execute_query` result — `search_*`
   tools return at most 50 rows with `total: null` and cannot confirm scale
-- **Bidders and bid prices are not queryable** — read them per procurement from the ATN-1 XLSX:
+- **Prefer views over raw tables** inside `execute_query`:
+  - `v_company` — company + Sodra data + compliance flags
+  - `v_sutartys` — contracts with resolved buyer/supplier names
+  - `v_pirkimas` — procurement notices (CVP IS + CVPP); filter `WHERE "saltinis" = 'cvpis'` for procedure-type analysis
+  - `v_person_links` — PINREG links to companies
+  - `v_bylos` — court/admin cases linked to companies
+  - `v_dalyviai` — ATN-1 bid participant data: bidder codes, prices, ranks (CVP IS only, ~400 procurements)
+- **Bidders and bid prices**: check `v_dalyviai` first for parsed ATN-1 data. If not there, use per-procurement route:
   `get_viesasis_pirkimas(pirkimoId)` → ATN-1 file (filename `PPA-`/`ATN-`/`Atn-1`) →
   `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` (p.4 bidders+codes, p.7 ranked bids+prices). Only new CVP IS
   procurements (~2022→today) have these; old CVPP procurements have none. See **Participant & bid data** in
