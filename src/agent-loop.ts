@@ -25,7 +25,6 @@ export interface AgentOptions {
   agentName: string;
   cwd?: string;
   enableMcp?: boolean;
-  maxBudgetUsd?: number;
 }
 
 export interface AgentResult {
@@ -44,7 +43,6 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     agentName,
     cwd = process.cwd(),
     enableMcp = true,
-    maxBudgetUsd,
   } = options;
 
   const builtinTools = ["Read", "Write", "Edit"];
@@ -69,10 +67,6 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     allowedTools.join(","),
     "--no-session-persistence",
   ];
-
-  if (maxBudgetUsd) {
-    args.push("--max-budget-usd", String(maxBudgetUsd));
-  }
 
   args.push(userMessage);
 

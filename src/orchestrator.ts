@@ -37,7 +37,7 @@ export async function investigate(caseId: string): Promise<void> {
     initLogger(caseDir);
     log("");
     log("🚀 Tyras Investigation Orchestrator (resuming)");
-    log(`   Model: ${CONFIG.model}  Budget: $${CONFIG.maxBudgetPerStep}/step  Parallel: ${CONFIG.parallelThemes}`);
+    log(`   Model: ${CONFIG.model}  Parallel: ${CONFIG.parallelThemes}`);
     log(`   Case:  ${caseId}`);
     log(`   Status: ${saved.status}, ${saved.completedThemes.length} themes done`);
     log("");
@@ -58,7 +58,7 @@ export async function investigate(caseId: string): Promise<void> {
   initLogger(caseDir);
   log("");
   log("🚀 Tyras Investigation Orchestrator");
-  log(`   Model: ${CONFIG.model}  Budget: $${CONFIG.maxBudgetPerStep}/step  Parallel: ${CONFIG.parallelThemes}`);
+  log(`   Model: ${CONFIG.model}  Parallel: ${CONFIG.parallelThemes}`);
   log(`   Case:  ${caseId}`);
   log(`   Dir:   ${caseDir}/`);
   log("");
@@ -87,7 +87,7 @@ async function runPipeline(
     log("📋 Phase 1: Planning");
     log("");
     const { handoff, step } = await withRetry("planner", () =>
-      runPlanner(casePrompt, caseId, CONFIG.model, CONFIG.maxBudgetPerStep),
+      runPlanner(casePrompt, caseId, CONFIG.model),
     );
     plan = handoff;
     state.plan = plan;
@@ -126,7 +126,7 @@ async function runPipeline(
     log("📊 Phase 3: Report");
     log("");
     const { step } = await withRetry("reporter", () =>
-      runReporter(caseId, caseDir, CONFIG.model, CONFIG.maxBudgetPerStep),
+      runReporter(caseId, caseDir, CONFIG.model),
     );
     recordStep(state, step);
     state.status = "tech-review";
@@ -138,7 +138,7 @@ async function runPipeline(
     log("🔧 Phase 4: Tech Review");
     log("");
     const { step } = await withRetry("tech-reviewer", () =>
-      runTechReviewer(caseId, caseDir, CONFIG.model, CONFIG.maxBudgetPerStep),
+      runTechReviewer(caseId, caseDir, CONFIG.model),
     );
     recordStep(state, step);
     state.status = "complete";
@@ -173,7 +173,7 @@ async function runThemesSequential(
     };
 
     const { step } = await withRetry(`investigator-${theme.index}`, () =>
-      runInvestigator(inputs, CONFIG.model, CONFIG.maxBudgetPerStep),
+      runInvestigator(inputs, CONFIG.model),
     );
     recordStep(state, step);
     state.completedThemes.push(theme.index);
@@ -203,7 +203,7 @@ async function runThemesParallel(
       nextThemeIndex: rest.length > 0 ? rest[0].index : 0,
     };
     const { step } = await withRetry(`investigator-${first.index}`, () =>
-      runInvestigator(inputs, CONFIG.model, CONFIG.maxBudgetPerStep),
+      runInvestigator(inputs, CONFIG.model),
     );
     recordStep(state, step);
     state.completedThemes.push(first.index);
@@ -232,7 +232,7 @@ async function runThemesParallel(
           nextThemeIndex: nextIdx,
         };
         return withRetry(`investigator-${theme.index}`, () =>
-          runInvestigator(inputs, CONFIG.model, CONFIG.maxBudgetPerStep),
+          runInvestigator(inputs, CONFIG.model),
         );
       }),
     );

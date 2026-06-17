@@ -9,7 +9,6 @@ export async function runTechReviewer(
   caseId: string,
   caseDir: string,
   model: string,
-  maxBudgetUsd?: number,
 ): Promise<{ step: StepResult }> {
   const techReportPath = `${caseDir}/tech-report.md`;
   let techReport = "";
@@ -33,7 +32,6 @@ ${techReport || "No tech report found — write a summary noting that no technic
     model,
     agentName: "tech-reviewer",
     enableMcp: false,
-    maxBudgetUsd: Math.min(maxBudgetUsd ?? 1.0, 1.0),
   });
 
   const step: StepResult = {

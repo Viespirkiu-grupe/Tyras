@@ -9,7 +9,6 @@ export async function runReporter(
   caseId: string,
   caseDir: string,
   model: string,
-  maxBudgetUsd?: number,
 ): Promise<{ step: StepResult }> {
   const themeFiles = await listThemeFiles(caseDir);
   const themeFileList = themeFiles.map((f) => `- ${caseDir}/${f}`).join("\n");
@@ -39,7 +38,6 @@ This ensures partial progress is saved even if something fails mid-way.`;
     model,
     agentName: "reporter",
     enableMcp: false,
-    maxBudgetUsd,
   });
 
   const step: StepResult = {

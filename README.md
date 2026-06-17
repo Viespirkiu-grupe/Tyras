@@ -128,7 +128,6 @@ flowchart TD
 |-----------------------|--------------------|----------------------------------|
 | `MODEL`               | `sonnet`           | Claude modelio alias             |
 | `MAX_RETRIES`         | `3`                | Maks. bandymų skaičius per etapą |
-| `MAX_BUDGET_PER_STEP` | `5.0`              | Maks. USD per etapą              |
 | `PARALLEL`            | `false`            | Lygiagretus temų vykdymas        |
 
 ---

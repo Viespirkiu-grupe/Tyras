@@ -8,7 +8,6 @@ export async function runPlanner(
   casePrompt: string,
   caseId: string,
   model: string,
-  maxBudgetUsd?: number,
 ): Promise<{ handoff: PlannerHandoff; step: StepResult }> {
   const userMessage = `## Investigation Case
 
@@ -25,7 +24,6 @@ Begin by reading the theme index at docs/index/mcp-investigator-prompt.md, then 
     model,
     agentName: "planner",
     enableMcp: true,
-    maxBudgetUsd,
   });
 
   const handoff = parseHandoff(result.text);

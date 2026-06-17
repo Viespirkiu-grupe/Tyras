@@ -15,7 +15,6 @@ Prerequisites:
 Environment variables:
   MODEL                Model alias (default: sonnet). Use opus, haiku, etc.
   MAX_RETRIES          Max retries per step (default: 3)
-  MAX_BUDGET_PER_STEP  Max USD per step (default: 5.0)
   PARALLEL             Enable parallel theme execution (default: false)
 
 Pipeline:

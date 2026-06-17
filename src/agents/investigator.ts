@@ -7,7 +7,6 @@ const systemPrompt = loadPrompt("investigator");
 export async function runInvestigator(
   inputs: InvestigatorInputs,
   model: string,
-  maxBudgetUsd?: number,
 ): Promise<{ step: StepResult }> {
   const userMessage = `## Theme Investigation Assignment
 
@@ -29,7 +28,6 @@ Start by reading the dossier, then any prior theme findings files in the investi
     model,
     agentName: `investigator-${inputs.themeIndex}`,
     enableMcp: true,
-    maxBudgetUsd,
   });
 
   const step: StepResult = {
