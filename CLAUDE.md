@@ -5,48 +5,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
+npm run investigate -- investigate "Case description..."       # run full investigation
+npm run investigate -- investigate "..." --case-id inv-2026-003  # with explicit case ID
+npm run investigate -- resume inv-2026-003                     # resume interrupted investigation
 npm run format          # format all *.md files with Prettier
 npm run format:check    # check formatting without writing
+npx tsc --noEmit        # type-check TypeScript
 ```
 
 ## What this repo is
 
-A Lithuanian public procurement fraud investigation system. It uses a multi-agent workflow driven by Claude Code
-subagents and a local MCP server (`viespirkiai-local`) that exposes Lithuanian procurement, company registry, and court
-data.
+A Lithuanian public procurement fraud investigation system. It uses a programmatic TypeScript pipeline that spawns
+`claude -p` subprocesses for each investigation step, with a local MCP server (`viespirkiai-local`) that exposes
+Lithuanian procurement, company registry, and court data.
 
-There is no application code to build or test — the "output" is investigation reports written as Markdown files under
-`investigations/`.
+The "output" is investigation reports written as Markdown files under `investigations/`.
 
 ## Architecture
 
-### Agent chain (top-level orchestration)
+### Programmatic pipeline (`src/`)
 
-Three specialist agents in `.claude/agents/` run sequentially for every investigation. **Subagents cannot spawn other
-subagents** — the Agent/Task tool is not available inside a subagent. So the agents do NOT chain into each other; the
-**top-level session (you, the main Claude Code conversation) is the orchestrator** that spawns each agent in turn and
-reads its returned handoff to decide what to spawn next.
+The primary investigation pipeline is a TypeScript orchestrator that spawns `claude -p` (print mode) subprocesses.
+Each agent step runs as an independent Claude session with restricted tools and streaming JSON output. Uses the CLI
+subscription — no API key needed.
 
-1. **`fraud-investigation-planner`** — parses the case prompt, queries MCP once for all named entities, writes
-   `dossier.md` and `plan.md`, then **returns a handoff** listing the ordered themes (each with its exact theme-document
-   path and output path). It does not spawn anything.
-2. **`procurement-fraud-investigator`** — handles one theme per instance; reads the shared dossier, runs theme-specific
-   MCP queries, writes its findings file, updates the dossier Agent Chain table, then **returns a handoff** stating the
-   next theme index (or `0` = no more themes → reporter is next). It does not spawn anything.
-3. **`fraud-investigation-reporter`** — synthesis only, no MCP queries; reads all theme files and writes the final
-   `report.md` with supervisory authority referral recommendations. Terminal agent.
+```
+src/
+  index.ts              ← CLI entry point
+  orchestrator.ts       ← pipeline: planner → investigators → reporter
+  agent-loop.ts         ← claude -p subprocess wrapper (stream-json output)
+  config.ts             ← env-var configuration
+  types.ts              ← shared types
+  agents/planner.ts     ← planner agent function
+  agents/investigator.ts ← investigator agent function
+  agents/reporter.ts    ← reporter agent function
+  prompts/*.md          ← system prompts (appended to Claude Code defaults)
+  io/workspace.ts       ← file management helpers
+```
 
-**Orchestration loop (run from the top-level session):**
+**Key design decisions:**
 
-1. Spawn `fraud-investigation-planner` with the case prompt. When it returns, read `plan.md` for the ordered theme list.
-2. For each theme in order, spawn one `procurement-fraud-investigator` with that theme's inputs (`case_id`,
-   `dossier_path`, `plan_path`, `theme_index`, `theme_name`, `theme_document`, `output_path`, `next_theme_index`). Wait
-   for it to return before spawning the next — they run sequentially because each reads the prior themes' findings.
-3. After the last investigator returns (`next_theme_index == 0`), spawn `fraud-investigation-reporter` to write
-   `report.md`.
+- Each agent = one `claude -p` subprocess with `--tools "Read,Write,Edit"` (no Agent, no Bash).
+- MCP tools available natively from the project's `.claude` MCP config.
+- `--allowed-tools` pre-approves all tools (no interactive permission prompts).
+- `--max-budget-usd` caps cost per step.
+- `--output-format stream-json` streams tool calls for real-time visibility.
+- Automatic retry with exponential backoff on failures.
+- State checkpointed to `state.json` after each step — `resume` picks up where it left off.
+- Optional parallel theme execution (`PARALLEL=true`).
+- Zero runtime dependencies — only uses the `claude` CLI binary.
 
-The planner run is triggered by the user; the investigators and reporter are spawned by the top-level orchestrator, not
-by each other.
+**Environment variables:** `MODEL` (default: sonnet), `MAX_RETRIES`, `MAX_BUDGET_PER_STEP`, `PARALLEL`.
+
+### Legacy agent chain (`.claude/agents/`)
+
+Three Claude Code agent definitions remain in `.claude/agents/` for ad-hoc interactive use. The programmatic pipeline
+above is preferred for full investigations.
 
 ### Investigation workspace
 
