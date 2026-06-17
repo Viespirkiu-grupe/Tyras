@@ -67,7 +67,7 @@ export async function preflightMcp(): Promise<void> {
   try {
     const output = execSync(
       `echo "Call get_schema with no arguments and return the result exactly." | claude -p --output-format json --no-session-persistence --tools "" --allowed-tools "${getSchemaTool}"`,
-      { encoding: "utf-8", timeout: 30_000 },
+      { encoding: "utf-8", timeout: 90_000 },
     );
     const result = JSON.parse(output);
     if (result?.result && !result.result.includes("error")) {
