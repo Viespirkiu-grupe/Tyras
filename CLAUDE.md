@@ -49,7 +49,3 @@ feedback loop for identifying data gaps and tool deficiencies — do not skip it
 ## Theme library
 
 28 fraud detection themes in `docs/themes/`. Index and MCP tool reference: `docs/index/mcp-investigator-prompt.md`.
-
-## Formatting
-
-Prettier formats all `.md` files (print width 120, prose wrap always). Run `npm run format` before committing.

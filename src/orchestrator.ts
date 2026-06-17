@@ -1,4 +1,5 @@
 import * as readline from "readline";
+import { execSync } from "child_process";
 import { runPlanner } from "./agents/planner.js";
 import { runInvestigator } from "./agents/investigator.js";
 import { runReporter } from "./agents/reporter.js";
@@ -95,6 +96,7 @@ async function runPipeline(
     state.plan = plan;
     state.status = "investigating";
     recordStep(state, step);
+    formatDocuments(caseDir);
     await workspace.saveState(caseDir, state);
     log("");
     log(`   📌 Plan: ${plan.themes.length} themes selected`);
@@ -131,6 +133,7 @@ async function runPipeline(
       runReporter(caseId, caseDir, CONFIG.model),
     );
     recordStep(state, step);
+    formatDocuments(caseDir);
     state.status = "tech-review";
     await workspace.saveState(caseDir, state);
     log("");
@@ -143,6 +146,7 @@ async function runPipeline(
       runTechReviewer(caseId, caseDir, CONFIG.model),
     );
     recordStep(state, step);
+    formatDocuments(caseDir);
     state.status = "complete";
     await workspace.saveState(caseDir, state);
     log("");
@@ -178,6 +182,7 @@ async function runThemesSequential(
       runInvestigator(inputs, CONFIG.model),
     );
     recordStep(state, step);
+    formatDocuments(state.caseDir);
     state.completedThemes.push(theme.index);
     await workspace.saveState(state.caseDir, state);
     log("");
@@ -208,6 +213,7 @@ async function runThemesParallel(
       runInvestigator(inputs, CONFIG.model),
     );
     recordStep(state, step);
+    formatDocuments(state.caseDir);
     state.completedThemes.push(first.index);
     await workspace.saveState(state.caseDir, state);
     log("");
@@ -258,6 +264,7 @@ async function runThemesParallel(
         recordStep(state, failStep);
       }
     }
+    formatDocuments(state.caseDir);
     await workspace.saveState(state.caseDir, state);
     log("");
   }
@@ -323,6 +330,14 @@ async function confirm(message: string): Promise<boolean> {
       resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
     });
   });
+}
+
+function formatDocuments(caseDir: string): void {
+  try {
+    execSync(`npx prettier --write "${caseDir}/**/*.md"`, { stdio: "ignore" });
+  } catch {
+    warn("  ⚠️  Prettier formatting failed — continuing");
+  }
 }
 
 function sleep(ms: number): Promise<void> {
