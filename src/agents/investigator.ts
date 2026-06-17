@@ -9,19 +9,46 @@ export async function runInvestigator(
   inputs: InvestigatorInputs,
   model: string,
 ): Promise<{ step: StepResult }> {
+  const priorFindingsBlock = inputs.priorFindings.length > 0
+    ? inputs.priorFindings.map((f) =>
+        `### Prior findings: ${f.path}\n\n${f.content}`
+      ).join("\n\n---\n\n")
+    : "(no prior theme findings yet — you are the first theme)";
+
   const userMessage = `## Theme Investigation Assignment
 
 **Case ID:** ${inputs.caseId}
 **Date:** ${new Date().toISOString().split("T")[0]}
 **Theme index:** ${inputs.themeIndex}
 **Theme name:** ${inputs.themeName}
-**Theme document:** ${inputs.themeDocument}
 **Output path:** ${inputs.outputPath}
 **Dossier path:** ${inputs.dossierPath}
 **Plan path:** ${inputs.planPath}
 **Next theme index:** ${inputs.nextThemeIndex} ${inputs.nextThemeIndex === 0 ? "(you are the LAST theme)" : ""}
 
-Start by reading the dossier, then any prior theme findings files in the investigation directory, then your theme document. After that, run theme-specific MCP queries and write your findings.`;
+---
+
+## Shared Dossier
+
+${inputs.dossierContent}
+
+---
+
+## Prior Theme Findings
+
+${priorFindingsBlock}
+
+---
+
+## Theme Document: ${inputs.themeName}
+
+Source: ${inputs.themeDocument}
+
+${inputs.themeDocContent}
+
+---
+
+All context is provided above. Do NOT re-read these files. Proceed directly to running theme-specific MCP queries and writing your findings.`;
 
   const result = await runAgent({
     systemPrompt,

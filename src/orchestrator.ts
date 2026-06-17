@@ -160,6 +160,46 @@ async function runPipeline(
   printSummary(state);
 }
 
+async function buildInvestigatorInputs(
+  plan: PlannerHandoff,
+  theme: PlannerHandoff["themes"][number],
+  nextThemeIndex: number,
+  state: InvestigationState,
+): Promise<InvestigatorInputs> {
+  const dossierContent = await workspace.readFile(plan.dossierPath);
+  const themeDocContent = await workspace.readFile(theme.themeDocument);
+
+  const allThemeFiles = await workspace.listThemeFiles(state.caseDir);
+  const priorFiles = allThemeFiles.filter((f) => {
+    const m = f.match(/^theme-(\d+)/);
+    return m && parseInt(m[1], 10) < theme.index;
+  });
+  const priorFindings: { path: string; content: string }[] = [];
+  for (const f of priorFiles) {
+    const fullPath = `${state.caseDir}/${f}`;
+    try {
+      priorFindings.push({ path: fullPath, content: await workspace.readFile(fullPath) });
+    } catch {
+      // file may have been removed between listing and reading
+    }
+  }
+
+  return {
+    caseId: state.caseId,
+    caseDir: state.caseDir,
+    dossierPath: plan.dossierPath,
+    planPath: plan.planPath,
+    themeIndex: theme.index,
+    themeName: theme.name,
+    themeDocument: theme.themeDocument,
+    outputPath: theme.outputPath,
+    nextThemeIndex,
+    dossierContent,
+    themeDocContent,
+    priorFindings,
+  };
+}
+
 async function runThemesSequential(
   plan: PlannerHandoff,
   themes: PlannerHandoff["themes"],
@@ -171,17 +211,7 @@ async function runThemesSequential(
 
     log(`  📌 Theme ${theme.index}/${plan.themes.length}: ${theme.name} [${theme.priority}]`);
 
-    const inputs: InvestigatorInputs = {
-      caseId: state.caseId,
-      caseDir: state.caseDir,
-      dossierPath: plan.dossierPath,
-      planPath: plan.planPath,
-      themeIndex: theme.index,
-      themeName: theme.name,
-      themeDocument: theme.themeDocument,
-      outputPath: theme.outputPath,
-      nextThemeIndex,
-    };
+    const inputs = await buildInvestigatorInputs(plan, theme, nextThemeIndex, state);
 
     const { step } = await withRetry(`investigator-${theme.index}`, () =>
       runInvestigator(inputs, CONFIG.model),
@@ -203,17 +233,9 @@ async function runThemesParallel(
 
   if (first) {
     log(`  📌 Theme ${first.index}: ${first.name} [sequential baseline]`);
-    const inputs: InvestigatorInputs = {
-      caseId: state.caseId,
-      caseDir: state.caseDir,
-      dossierPath: plan.dossierPath,
-      planPath: plan.planPath,
-      themeIndex: first.index,
-      themeName: first.name,
-      themeDocument: first.themeDocument,
-      outputPath: first.outputPath,
-      nextThemeIndex: rest.length > 0 ? rest[0].index : 0,
-    };
+    const inputs = await buildInvestigatorInputs(
+      plan, first, rest.length > 0 ? rest[0].index : 0, state,
+    );
     const { step } = await withRetry(`investigator-${first.index}`, () =>
       runInvestigator(inputs, CONFIG.model),
     );
@@ -229,25 +251,20 @@ async function runThemesParallel(
     const batch = rest.slice(batchStart, batchStart + BATCH_SIZE);
     log(`  ⚡ Parallel batch: themes ${batch.map((t) => t.index).join(", ")}`);
 
-    const results = await Promise.allSettled(
+    const batchInputs = await Promise.all(
       batch.map((theme, i) => {
         const globalIdx = batchStart + i;
         const nextIdx = globalIdx + 1 < rest.length ? rest[globalIdx + 1].index : 0;
-        const inputs: InvestigatorInputs = {
-          caseId: state.caseId,
-          caseDir: state.caseDir,
-          dossierPath: plan.dossierPath,
-          planPath: plan.planPath,
-          themeIndex: theme.index,
-          themeName: theme.name,
-          themeDocument: theme.themeDocument,
-          outputPath: theme.outputPath,
-          nextThemeIndex: nextIdx,
-        };
-        return withRetry(`investigator-${theme.index}`, () =>
-          runInvestigator(inputs, CONFIG.model),
-        );
+        return buildInvestigatorInputs(plan, theme, nextIdx, state);
       }),
+    );
+
+    const results = await Promise.allSettled(
+      batchInputs.map((inputs) =>
+        withRetry(`investigator-${inputs.themeIndex}`, () =>
+          runInvestigator(inputs, CONFIG.model),
+        ),
+      ),
     );
 
     for (let i = 0; i < results.length; i++) {
