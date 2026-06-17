@@ -5,12 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run investigate -- investigate "Case description..." --keyword kelme       # run full investigation
-npm run investigate -- investigate "..." --case-id 20260617_kelme              # with explicit case ID
-npm run investigate -- resume 20260617_kelme                                   # resume interrupted investigation
-npm run format          # format all *.md files with Prettier
-npm run format:check    # check formatting without writing
-npx tsc --noEmit        # type-check TypeScript
+npm run investigate 20260617_kelme   # first run creates case.md; second run starts; re-run resumes
+npm run format                       # format all *.md files with Prettier
+npm run format:check                 # check formatting without writing
+npx tsc --noEmit                     # type-check TypeScript
 ```
 
 ## What this repo is
@@ -55,7 +53,7 @@ src/
 - `--max-budget-usd` caps cost per step.
 - `--output-format stream-json` streams tool calls for real-time visibility.
 - Automatic retry with exponential backoff on failures.
-- State checkpointed to `state.json` after each step — `resume` picks up where it left off.
+- State checkpointed to `investigation-state.json` after each step — re-running the same case ID resumes.
 - Optional parallel theme execution (`PARALLEL=true`).
 - Zero runtime dependencies — only uses the `claude` CLI binary.
 
@@ -72,14 +70,16 @@ Each case lives under `investigations/<case-id>/` (format `YYYYMMDD_keyword`):
 
 ```
 investigations/20260617_kelme/
-  dossier.md              ← shared entity data; written once by planner; all agents read it
-  plan.md                 ← selected themes and per-theme query plans
-  theme-01-<name>.md      ← findings written by each investigator agent
+  case.md                     ← case description written by the user
+  dossier.md                  ← shared entity data; written once by planner; all agents read it
+  plan.md                     ← selected themes and per-theme query plans
+  theme-01-<name>.md          ← findings written by each investigator agent
   theme-02-<name>.md
-  report.md               ← final report written by the reporter agent
-  tech-report.md          ← each agent appends MCP tool failures/gaps here
-  tech-report-summary.md  ← categorized technical issues (tech-reviewer agent)
-  investigation.log       ← full orchestrator log with timestamps
+  report.md                   ← final report written by the reporter agent
+  tech-report.md              ← each agent appends MCP tool failures/gaps here
+  tech-report-summary.md      ← categorized technical issues (tech-reviewer agent)
+  investigation.log           ← full orchestrator log with timestamps
+  investigation-state.json    ← orchestration state (for resume)
 ```
 
 ### Theme library

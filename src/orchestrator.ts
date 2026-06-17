@@ -1,3 +1,4 @@
+import * as readline from "readline";
 import { runPlanner } from "./agents/planner.js";
 import { runInvestigator } from "./agents/investigator.js";
 import { runReporter } from "./agents/reporter.js";
@@ -7,36 +8,65 @@ import { initLogger, log, warn } from "./io/logger.js";
 import { CONFIG } from "./config.js";
 import type { InvestigationState, InvestigatorInputs, StepResult, PlannerHandoff } from "./types.js";
 
-export interface InvestigateOptions {
-  casePrompt: string;
-  caseId?: string;
-  keyword?: string;
-  resume?: boolean;
-}
+const CASE_MD_TEMPLATE = `# Case Description
 
-export async function investigate(options: InvestigateOptions): Promise<void> {
-  const { casePrompt, resume } = options;
+Describe the case here. Include:
+- Named organizations and their JAR codes (if known)
+- Named individuals
+- Contract types, amounts, time periods
+- Alleged fraud patterns
+- Any specific concerns or leads
+`;
 
+export async function investigate(caseId: string): Promise<void> {
+  const caseDir = await workspace.createWorkspace(caseId);
+  const caseMd = workspace.caseMdPath(caseDir);
+
+  // State 1: no case.md — create template and exit
+  if (!(await workspace.fileExists(caseMd))) {
+    await workspace.writeFile(caseMd, CASE_MD_TEMPLATE);
+    console.log(`Created: ${caseMd}`);
+    console.log(`Write your case description in this file, then run again:`);
+    console.log(`  npm run investigate ${caseId}`);
+    return;
+  }
+
+  const casePrompt = await workspace.readFile(caseMd);
+
+  // State 2/3: case.md exists — check for saved state
+  const saved = (await workspace.loadState(caseDir)) as InvestigationState | null;
+
+  if (saved) {
+    // State 3: resume
+    initLogger(caseDir);
+    log("=== Tyras Investigation Orchestrator (resuming) ===\n");
+    log(`Model:    ${CONFIG.model}`);
+    log(`Budget:   $${CONFIG.maxBudgetPerStep}/step`);
+    log(`Parallel: ${CONFIG.parallelThemes}`);
+    log(`Case:     ${caseId}`);
+    log(`Status:   ${saved.status}, ${saved.completedThemes.length} themes done\n`);
+    await runPipeline(caseId, caseDir, casePrompt, saved);
+    return;
+  }
+
+  // State 2: new investigation — confirm with user
+  console.log(`\n--- Case: ${caseId} ---\n`);
+  console.log(casePrompt.trim());
+  console.log();
+
+  const confirmed = await confirm("Start investigation?");
+  if (!confirmed) {
+    console.log("Aborted. Edit case.md and run again.");
+    return;
+  }
+
+  initLogger(caseDir);
   log("=== Tyras Investigation Orchestrator ===\n");
   log(`Model:    ${CONFIG.model}`);
   log(`Budget:   $${CONFIG.maxBudgetPerStep}/step`);
-  log(`Parallel: ${CONFIG.parallelThemes}\n`);
-
-  let caseId: string;
-  if (options.caseId) {
-    caseId = options.caseId;
-  } else if (options.keyword) {
-    const keyword = workspace.sanitizeKeyword(options.keyword);
-    caseId = await workspace.generateCaseId(keyword);
-  } else {
-    throw new Error("Provide --keyword or --case-id");
-  }
-
-  const caseDir = await workspace.createWorkspace(caseId);
-  initLogger(caseDir);
-
-  log(`Case: ${caseId}`);
-  log(`Dir:  ${caseDir}/\n`);
+  log(`Parallel: ${CONFIG.parallelThemes}`);
+  log(`Case:     ${caseId}`);
+  log(`Dir:      ${caseDir}/\n`);
 
   const state: InvestigationState = {
     caseId,
@@ -48,14 +78,15 @@ export async function investigate(options: InvestigateOptions): Promise<void> {
     startTime: Date.now(),
   };
 
-  if (resume) {
-    const saved = (await workspace.loadState(caseDir)) as InvestigationState | null;
-    if (saved) {
-      Object.assign(state, saved);
-      log(`Resumed: ${state.status}, ${state.completedThemes.length} themes done\n`);
-    }
-  }
+  await runPipeline(caseId, caseDir, casePrompt, state);
+}
 
+async function runPipeline(
+  caseId: string,
+  caseDir: string,
+  casePrompt: string,
+  state: InvestigationState,
+): Promise<void> {
   // Phase 1: Planning
   let plan: PlannerHandoff;
   if (state.status === "planning") {
@@ -272,6 +303,16 @@ function printSummary(state: InvestigationState): void {
       `  ${step.stepName.padEnd(40)} ${min.padStart(6)}min  $${step.costUsd.toFixed(4).padStart(8)}  ${step.numTurns} turns`,
     );
   }
+}
+
+async function confirm(message: string): Promise<boolean> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(`${message} (y/n) `, (answer) => {
+      rl.close();
+      resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
+    });
+  });
 }
 
 function sleep(ms: number): Promise<void> {

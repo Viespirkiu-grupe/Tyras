@@ -2,35 +2,16 @@ import * as fs from "fs/promises";
 import * as path from "path";
 
 const INVESTIGATIONS_DIR = "investigations";
-
-export async function generateCaseId(keyword: string): Promise<string> {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const base = `${date}_${keyword}`;
-
-  try {
-    const entries = await fs.readdir(INVESTIGATIONS_DIR);
-    if (!entries.includes(base)) return base;
-    let suffix = 2;
-    while (entries.includes(`${base}_${suffix}`)) suffix++;
-    return `${base}_${suffix}`;
-  } catch {
-    return base;
-  }
-}
-
-export function sanitizeKeyword(raw: string): string {
-  return raw
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "")
-    .slice(0, 20);
-}
+const STATE_FILE = "investigation-state.json";
 
 export async function createWorkspace(caseId: string): Promise<string> {
   const caseDir = path.join(INVESTIGATIONS_DIR, caseId);
   await fs.mkdir(caseDir, { recursive: true });
   return caseDir;
+}
+
+export function caseMdPath(caseDir: string): string {
+  return path.join(caseDir, "case.md");
 }
 
 export async function writeFile(filePath: string, content: string): Promise<void> {
@@ -63,12 +44,12 @@ export async function listThemeFiles(caseDir: string): Promise<string[]> {
 }
 
 export async function saveState(caseDir: string, state: object): Promise<void> {
-  await writeFile(path.join(caseDir, "state.json"), JSON.stringify(state, null, 2));
+  await writeFile(path.join(caseDir, STATE_FILE), JSON.stringify(state, null, 2));
 }
 
 export async function loadState(caseDir: string): Promise<object | null> {
   try {
-    const raw = await readFile(path.join(caseDir, "state.json"));
+    const raw = await readFile(path.join(caseDir, STATE_FILE));
     return JSON.parse(raw);
   } catch {
     return null;

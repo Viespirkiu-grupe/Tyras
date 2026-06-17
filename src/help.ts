@@ -2,17 +2,15 @@ export const HELP_TEXT = `
 Tyras — Lithuanian Public Procurement Fraud Investigation Pipeline
 
 Usage:
-  npm run investigate -- investigate "Case description..." --keyword kelme
-  npm run investigate -- investigate "Case description..." --case-id 20260617_kelme
-  npm run investigate -- resume 20260617_kelme
+  npm run investigate 20260617_kelme
+
+  First run  — creates investigations/20260617_kelme/case.md for you to fill in.
+  Second run — reads case.md, asks for confirmation, then runs the full pipeline.
+  After that — resumes from where it left off (reads investigation-state.json).
 
 Prerequisites:
   - Claude CLI installed and authenticated (claude auth)
   - MCP server viespirkiai-local configured in .claude settings
-
-Options:
-  --keyword <word>   Short Latin keyword for case ID (max 20 chars, e.g. kelme, vilnius_roads)
-  --case-id <id>     Explicit case ID (overrides --keyword)
 
 Environment variables:
   MODEL                Model alias (default: sonnet). Use opus, haiku, etc.
@@ -27,7 +25,8 @@ Pipeline:
   4. Tech Reviewer — categorizes MCP and system issues from tech-report
 
 Output:
-  investigations/<YYYYMMDD_keyword>/
+  investigations/<case-id>/
+    case.md                 — case description (written by you)
     dossier.md              — shared entity data
     plan.md                 — selected themes and queries
     theme-NN-*.md           — per-theme findings
@@ -35,5 +34,5 @@ Output:
     tech-report.md          — MCP tool failures and data gaps
     tech-report-summary.md  — categorized technical issues
     investigation.log       — full orchestrator log with timestamps
-    state.json              — orchestration state (for resume)
+    investigation-state.json — orchestration state (for resume)
 `;

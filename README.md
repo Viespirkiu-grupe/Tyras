@@ -15,10 +15,13 @@ rekomendacijomis dėl susisiekimo su priežiūros institucijoms kaip STT, FNTT, 
    [Claude Code](https://code.claude.com/docs/en/quickstart)
 3. [Atsisiųskite šį repozitorių](https://github.com/Viespirkiu-grupe/Tyras/archive/refs/heads/main.zip) arba naudokite
    Git: `git clone https://github.com/Viespirkiu-grupe/Tyras.git`
-4. Atidarykite terminalą, eikite į šio repozitoriaus šakninį aplanką `Tyras/` ir paleiskite `claude` komandą.
-5. Įveskite `/mcp` ir patikrinkite, ar [Viešpirkiai MCP serveris](https://viespirkiai.org/mcp) pasiekiamas.
-6. Įveskite `/agents` ir pasirinkite Library → `fraud-investigation-planner`.
-7. Įrašykite pradinę tyrimo užklausą, pvz.:
+4. Atidarykite terminalą, eikite į šio repozitoriaus šakninį aplanką `Tyras/` ir paleiskite:
+
+```bash
+npm run investigate 20260617_sveikata
+```
+
+5. Sukuriamas failas `investigations/20260617_sveikata/case.md` — atidarykite jį ir aprašykite tyrimo atvejį, pvz.:
 
 ```text
 Ar gali pereiti per pagrindines institucijas, patikrinti IT paslaugų pirkimo konkursus, pasižiūrėti kas laimėjo kiekvieną etapą ir matant didesnę imtį paieškoti sąsajų.
@@ -26,9 +29,17 @@ Vienas iš rizikos veiksnių yra nedidelė techninės specifikacijos paruošimo 
 Apimtis (Scope) yra sveikatos ministerija ir visos sveikatos ministerijai pavaldžias institucijas.
 ```
 
-Daugiau nieko daryti nereikia — tiesiog stebėkite, kaip dirba agentai! Planuotojas išanalizuos jūsų užklausą, parinks
-tinkamas sukčiavimo temas ir sukurs tyrėjų agentus MCP užklausoms vykdyti. Galiausiai reporterio agentas apibendrins
-išvadas į struktūrizuotą ataskaitą su rekomendacijomis. `report.md` rasite aplanke `investigations/`.
+6. Paleiskite tą pačią komandą dar kartą:
+
+```bash
+npm run investigate 20260617_sveikata
+```
+
+Sistema parodys jūsų bylos aprašymą ir paprašys patvirtinimo. Po patvirtinimo prasideda tyrimas — planuotojas
+išanalizuos užklausą, parinks sukčiavimo temas, tyrėjai vykdys MCP užklausas, o reporteris apibendrins išvadas į
+`report.md`.
+
+Jei tyrimas nutrūksta, tiesiog paleiskite tą pačią komandą — sistema tęs nuo kur sustojo.
 
 > Paprastai vienas tyrimas trunka apie 30 minučių ir sunaudoja trečdalį sesijos žetonų.
 
@@ -118,15 +129,19 @@ flowchart TD
 
 ## Tyrimo darbo katalogas
 
-Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `inv-YYYY-NNN`):
+Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `YYYYMMDD_keyword`):
 
-| Failas               | Parašo                              | Paskirtis                                                  |
-| -------------------- | ----------------------------------- | ---------------------------------------------------------- |
-| `dossier.md`         | Planuotojas                         | Bendri subjektų duomenys; visi agentai nuskaito            |
-| `plan.md`            | Planuotojas                         | Parinktos temos ir temų užklausų planai                    |
-| `theme-NN-<name>.md` | Tyrėjas (po vieną kiekvienai temai) | Temų išvados ir neapdoroti MCP duomenys                    |
-| `report.md`          | Reporteris                          | Galutinė ataskaita su rekomendacijomis                     |
-| `tech-report.md`     | Visi agentai                        | MCP įrankių klaidos ir duomenų spragos (grįžtamasis ryšys) |
+| Failas                       | Parašo                              | Paskirtis                                                  |
+| ---------------------------- | ----------------------------------- | ---------------------------------------------------------- |
+| `case.md`                    | Vartotojas                          | Bylos aprašymas                                            |
+| `dossier.md`                 | Planuotojas                         | Bendri subjektų duomenys; visi agentai nuskaito            |
+| `plan.md`                    | Planuotojas                         | Parinktos temos ir temų užklausų planai                    |
+| `theme-NN-<name>.md`         | Tyrėjas (po vieną kiekvienai temai) | Temų išvados ir neapdoroti MCP duomenys                    |
+| `report.md`                  | Reporteris                          | Galutinė ataskaita su rekomendacijomis                     |
+| `tech-report.md`             | Visi agentai                        | MCP įrankių klaidos ir duomenų spragos (grįžtamasis ryšys) |
+| `tech-report-summary.md`     | Tech reviewer                       | Kategorizuotos techninės problemos                         |
+| `investigation.log`          | Orkestrantas                        | Pilnas orkestratoriaus žurnalas su laiko žymėmis            |
+| `investigation-state.json`   | Orkestrantas                        | Orchestracijos būsena (tęsimui)                            |
 
 ---
 
