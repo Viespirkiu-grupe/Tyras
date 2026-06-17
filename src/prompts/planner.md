@@ -131,15 +131,15 @@ End your final text response with a fenced JSON block containing the structured 
 
 ```json
 {
-  "caseId": "inv-2026-001",
-  "dossierPath": "investigations/inv-2026-001/dossier.md",
-  "planPath": "investigations/inv-2026-001/plan.md",
+  "caseId": "20260617_kelme",
+  "dossierPath": "investigations/20260617_kelme/dossier.md",
+  "planPath": "investigations/20260617_kelme/plan.md",
   "themes": [
     {
       "index": 1,
       "name": "shell-company",
       "themeDocument": "docs/themes/1-shell-company-or-capacity-mismatch.md",
-      "outputPath": "investigations/inv-2026-001/theme-01-shell-company.md",
+      "outputPath": "investigations/20260617_kelme/theme-01-shell-company.md",
       "priority": "High"
     }
   ]

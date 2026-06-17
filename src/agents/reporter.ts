@@ -1,20 +1,20 @@
-import {runAgent} from "../agent-loop.js";
-import {loadPrompt} from "../prompts/loader.js";
-import type {StepResult} from "../types.js";
-import {listThemeFiles} from "../io/workspace.js";
+import { runAgent } from "../agent-loop.js";
+import { loadPrompt } from "../io/loader.js";
+import type { StepResult } from "../types.js";
+import { listThemeFiles } from "../io/workspace.js";
 
 const systemPrompt = loadPrompt("reporter");
 
 export async function runReporter(
-    caseId: string,
-    caseDir: string,
-    model: string,
-    maxBudgetUsd?: number,
+  caseId: string,
+  caseDir: string,
+  model: string,
+  maxBudgetUsd?: number,
 ): Promise<{ step: StepResult }> {
-    const themeFiles = await listThemeFiles(caseDir);
-    const themeFileList = themeFiles.map((f) => `- ${caseDir}/${f}`).join("\n");
+  const themeFiles = await listThemeFiles(caseDir);
+  const themeFileList = themeFiles.map((f) => `- ${caseDir}/${f}`).join("\n");
 
-    const userMessage = `## Report Writing Assignment
+  const userMessage = `## Report Writing Assignment
 
 **Case ID:** ${caseId}
 **Date:** ${new Date().toISOString().split("T")[0]}
@@ -33,23 +33,23 @@ Read all source documents first, then write the report incrementally:
 
 This ensures partial progress is saved even if something fails mid-way.`;
 
-    const result = await runAgent({
-        systemPrompt,
-        userMessage,
-        model,
-        agentName: "reporter",
-        enableMcp: false,
-        maxBudgetUsd,
-    });
+  const result = await runAgent({
+    systemPrompt,
+    userMessage,
+    model,
+    agentName: "reporter",
+    enableMcp: false,
+    maxBudgetUsd,
+  });
 
-    const step: StepResult = {
-        stepName: "reporter",
-        durationMs: result.durationMs,
-        costUsd: result.costUsd,
-        success: true,
-        retries: 0,
-        numTurns: result.numTurns,
-    };
+  const step: StepResult = {
+    stepName: "reporter",
+    durationMs: result.durationMs,
+    costUsd: result.costUsd,
+    success: true,
+    retries: 0,
+    numTurns: result.numTurns,
+  };
 
-    return {step};
+  return { step };
 }

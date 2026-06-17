@@ -1,5 +1,5 @@
 import { runAgent } from "../agent-loop.js";
-import { loadPrompt } from "../prompts/loader.js";
+import { loadPrompt } from "../io/loader.js";
 import type { PlannerHandoff, StepResult } from "../types.js";
 
 const systemPrompt = loadPrompt("planner");

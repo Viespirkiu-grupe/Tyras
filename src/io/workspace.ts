@@ -3,20 +3,28 @@ import * as path from "path";
 
 const INVESTIGATIONS_DIR = "investigations";
 
-// @TODO: format must be date + keyword. For example: 20260517_kelme - agent will tell you keyword, just ask, it must be no more than 20 symbols, better a single or two words in Latin, lowercased, joined by underscore _
-export async function generateCaseId(): Promise<string> {
-  const year = new Date().getFullYear();
+export async function generateCaseId(keyword: string): Promise<string> {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const base = `${date}_${keyword}`;
+
   try {
     const entries = await fs.readdir(INVESTIGATIONS_DIR);
-    const existing = entries
-      .filter((e) => e.startsWith(`inv-${year}-`))
-      .map((e) => parseInt(e.split("-")[2], 10))
-      .filter((n) => !isNaN(n));
-    const next = existing.length > 0 ? Math.max(...existing) + 1 : 1;
-    return `inv-${year}-${String(next).padStart(3, "0")}`;
+    if (!entries.includes(base)) return base;
+    let suffix = 2;
+    while (entries.includes(`${base}_${suffix}`)) suffix++;
+    return `${base}_${suffix}`;
   } catch {
-    return `inv-${year}-001`;
+    return base;
   }
+}
+
+export function sanitizeKeyword(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 20);
 }
 
 export async function createWorkspace(caseId: string): Promise<string> {

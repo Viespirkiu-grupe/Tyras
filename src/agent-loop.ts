@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import * as readline from "readline";
-import type { TokenUsage } from "./types.js";
+import { log } from "./io/logger.js";
 
 const MCP_TOOLS = [
   "mcp__viespirkiai-local__execute_query",
@@ -75,7 +75,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
   args.push(userMessage);
 
-  console.log(`  [${agentName}] starting (model=${model}, mcp=${enableMcp})`);
+  log(`  [${agentName}] starting (model=${model}, mcp=${enableMcp})`);
 
   return new Promise<AgentResult>((resolve, reject) => {
     const proc = spawn("claude", args, {
@@ -133,7 +133,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         return;
       }
 
-      console.log(
+      log(
         `  [${agentName}] done (${numTurns} turns, $${costUsd.toFixed(4)}, ${(durationMs / 1000).toFixed(0)}s)`,
       );
       resolve({ text: finalResult, costUsd, durationMs, numTurns, sessionId });
@@ -152,7 +152,7 @@ function logMessage(msg: any, agentName: string): void {
         const name = block.name ?? "unknown";
         const shortName = name.replace("mcp__viespirkiai-local__", "");
         const argStr = summarizeArgs(block.input ?? {});
-        console.log(`  [${agentName}] ${shortName}(${argStr})`);
+        log(`  [${agentName}] ${shortName}(${argStr})`);
       }
     }
   }

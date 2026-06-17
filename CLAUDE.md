@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run investigate -- investigate "Case description..."       # run full investigation
-npm run investigate -- investigate "..." --case-id inv-2026-003  # with explicit case ID
-npm run investigate -- resume inv-2026-003                     # resume interrupted investigation
+npm run investigate -- investigate "Case description..." --keyword kelme       # run full investigation
+npm run investigate -- investigate "..." --case-id 20260617_kelme              # with explicit case ID
+npm run investigate -- resume 20260617_kelme                                   # resume interrupted investigation
 npm run format          # format all *.md files with Prettier
 npm run format:check    # check formatting without writing
 npx tsc --noEmit        # type-check TypeScript
@@ -31,16 +31,20 @@ subscription — no API key needed.
 
 ```
 src/
-  index.ts              ← CLI entry point
-  orchestrator.ts       ← pipeline: planner → investigators → reporter
-  agent-loop.ts         ← claude -p subprocess wrapper (stream-json output)
-  config.ts             ← env-var configuration
-  types.ts              ← shared types
-  agents/planner.ts     ← planner agent function
-  agents/investigator.ts ← investigator agent function
-  agents/reporter.ts    ← reporter agent function
-  prompts/*.md          ← system prompts (appended to Claude Code defaults)
-  io/workspace.ts       ← file management helpers
+  index.ts                ← CLI entry point
+  help.ts                 ← CLI help text
+  orchestrator.ts         ← pipeline: planner → investigators → reporter → tech-reviewer
+  agent-loop.ts           ← claude -p subprocess wrapper (stream-json output)
+  config.ts               ← env-var configuration
+  types.ts                ← shared types
+  agents/planner.ts       ← planner agent function
+  agents/investigator.ts  ← investigator agent function
+  agents/reporter.ts      ← reporter agent function
+  agents/tech-reviewer.ts ← tech report categorizer
+  prompts/*.md            ← system prompts (appended to Claude Code defaults)
+  io/workspace.ts         ← file management helpers
+  io/loader.ts            ← prompt file loader
+  io/logger.ts            ← dual console + file logger
 ```
 
 **Key design decisions:**
@@ -64,16 +68,18 @@ above is preferred for full investigations.
 
 ### Investigation workspace
 
-Each case lives under `investigations/<case-id>/` (format `inv-YYYY-NNN`):
+Each case lives under `investigations/<case-id>/` (format `YYYYMMDD_keyword`):
 
 ```
-investigations/inv-2026-001/
-  dossier.md          ← shared entity data; written once by planner; all agents read it
-  plan.md             ← selected themes and per-theme query plans
-  theme-01-<name>.md  ← findings written by each investigator agent
+investigations/20260617_kelme/
+  dossier.md              ← shared entity data; written once by planner; all agents read it
+  plan.md                 ← selected themes and per-theme query plans
+  theme-01-<name>.md      ← findings written by each investigator agent
   theme-02-<name>.md
-  report.md           ← final report written by the reporter agent
-  tech-report.md      ← each agent appends MCP tool failures/gaps here
+  report.md               ← final report written by the reporter agent
+  tech-report.md          ← each agent appends MCP tool failures/gaps here
+  tech-report-summary.md  ← categorized technical issues (tech-reviewer agent)
+  investigation.log       ← full orchestrator log with timestamps
 ```
 
 ### Theme library
