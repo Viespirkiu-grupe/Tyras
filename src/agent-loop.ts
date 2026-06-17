@@ -56,6 +56,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
   const args = [
     "-p",
+    "--verbose",
     "--output-format",
     "stream-json",
     "--model",
@@ -80,7 +81,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   return new Promise<AgentResult>((resolve, reject) => {
     const proc = spawn("claude", args, {
       cwd,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     let finalResult = "";
