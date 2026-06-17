@@ -45,85 +45,91 @@ Jei tyrimas nutrūksta, tiesiog paleiskite tą pačią komandą — sistema tęs
 
 ---
 
-## Agentų apžvalga
+## Komandos
 
-### `fraud-investigation-planner`
-
-Inicijuoja tyrimą pagal bylos aprašymą. Išanalizuoja bylą, vieną kartą klausinėja MCP visų pavadintų subjektų (įmonių ir
-asmenų), iš 28 temų bibliotekos parenka aktualias sukčiavimo temas, tada parašo bendrą dossier ir tyrimo planą. Sukuria
-pirmąjį tyrėjo agentą temų grandinei pradėti.
-
-**Paleidimas:** Vartotojas aprašo tyrimo tikslą — pvz. _„Ar gali pereiti per pagrindines institucijas, patikrinti IT
-paslaugų pirkimo konkursus..."_
+```bash
+npm run investigate 20260617_kelme   # pirmu paleidimu sukuriamas case.md; galima pleisti dar karta, tada bus pratęsiama nuo kur sustojo
+npm run format                       # dokumentų formatavimas, kad atrodytų tvarkingai
+```
 
 ---
 
-### `procurement-fraud-investigator`
+## Kaip veikia
 
-Kiekviena instancija vykdo vieną sukčiavimo temą. Nuskaito bendrą dossier ir visas ankstesnes temų išvadas, tada vykdo
-temai būdingas MCP užklausas (agregacijas, dokumentų paieškas, SQL per pirkimų rodinius). Parašo savo išvadų failą,
-prideda santrauką prie dossier ir sukuria kitą tyrėją arba reporterį, jei tai paskutinė tema.
-
-**Visada sukuriamas planuotojo arba ankstesnio tyrėjo. Tiesiogiai nepaleidžiamas.**
-
----
-
-### `fraud-investigation-reporter`
-
-Sintezės agentas MCP užklausų nevykdo. Nuskaito dossier ir visus temų išvadų failus, nustato tarptemines sąsajas ir
-parašo galutinę tyrimo ataskaitą. Apima įrodymų inventorių, subjektų santrauką ir parengtą skyrių su rekomendacijomis
-dėl kontaktavimo su priežiūros institucijoms (STT / FNTT / VPT / VK / KT).
-
-**Visada sukuriamas paskutinio tyrėjo agento. Tiesiogiai nepaleidžiamas.**
-
----
-
-## Agentų darbo eiga
+Tyras yra TypeScript orkestrantas, kuris paleidžia `claude -p` subprocesus kiekvienam tyrimo etapui. Kiekvienas agentas
+veikia kaip nepriklausoma Claude sesija su ribotais įrankiais (Read, Write, Edit + MCP). Agentai vienas kito
+nekviečia — orkestrantas valdo visą grandinę.
 
 ```mermaid
 flowchart TD
-    User(["Vartotojas: bylos aprašymas"]) --> Planner
+    User(["Vartotojas"]) -->|" npm run investigate case_id "| Orch
 
-    subgraph Planner["fraud-investigation-planner"]
-        P1["Išanalizuoja bylą\n(subjektai, tariami sukčiavimo tipai)"]
-        P2["Vieną kartą klausinėja MCP\nvisų pavadintų subjektų"]
-        P3["Parenka temas iš\n28 temų bibliotekos"]
-        P4["Parašo dossier.md\n+ plan.md"]
-        P1 --> P2 --> P3 --> P4
+    subgraph Orch["Orkestrantas (TypeScript)"]
+        direction LR
+        S1["📋 Planavimas"] --> S2["🔎 Tyrimas"] --> S3["📊 Ataskaita"] --> S4["🔧 Tech apžvalga"]
     end
 
-    Planner -->|" sukuria su 1 temos kontekstu "| Inv1
+    S1 -->|" claude -p "| Planner
+    S2 -->|" claude -p × N "| Inv
+    S3 -->|" claude -p "| Reporter
+    S4 -->|" claude -p "| Tech
 
-    subgraph Inv1["procurement-fraud-investigator (tema 1)"]
-        I1a["Nuskaito dossier + ankstesnes temas"]
-        I1b["Nuskaito temos dokumentą\niš docs/themes/"]
-        I1c["Vykdo temai būdingas\nMCP užklausas"]
-        I1d["Parašo theme-01-*.md\nPrideda prie dossier"]
-        I1a --> I1b --> I1c --> I1d
+    subgraph Planner["Planuotojas"]
+        P1["MCP užklausos subjektams"]
+        P2["Temų parinkimas"]
+        P3["dossier.md + plan.md"]
+        P1 --> P2 --> P3
     end
 
-    Inv1 -->|" sukuria su 2 temos kontekstu "| Inv2
-
-    subgraph Inv2["procurement-fraud-investigator (tema 2..N)"]
-        I2a["Nuskaito dossier + ankstesnes temas"]
-        I2b["Nuskaito temos dokumentą"]
-        I2c["Vykdo temai būdingas\nMCP užklausas"]
-        I2d["Parašo theme-NN-*.md\nPrideda prie dossier"]
-        I2a --> I2b --> I2c --> I2d
+    subgraph Inv["Tyrėjai (tema 1..N)"]
+        I1["Nuskaito dossier + ankstesnes temas"]
+        I2["MCP užklausos pagal temą"]
+        I3["theme-NN-*.md"]
+        I1 --> I2 --> I3
     end
 
-    Inv2 -->|" ...tęsiasi kiekvienai temai... "| InvN["tyrėjas (tema N — paskutinė)"]
-    InvN -->|" sukuria reporterį "| Reporter
-
-    subgraph Reporter["fraud-investigation-reporter"]
-        R1["Nuskaito dossier\n+ visus temų failus"]
-        R2["Sintezuoja tarptemines\nsąsajas"]
-        R3["Parašo report.md\nsu rekomendacijomis"]
-        R1 --> R2 --> R3
+    subgraph Reporter["Reporteris"]
+        R1["Sintezuoja visus failus"]
+        R2["report.md"]
+        R1 --> R2
     end
 
-    Reporter --> Output(["investigations/<case-id>/report.md"])
+    subgraph Tech["Tech Reviewer"]
+        T1["Kategorizuoja problemas"]
+        T2["tech-report-summary.md"]
+        T1 --> T2
+    end
+
+    Planner -.->|" MCP "| DB[(Viešpirkiai DB)]
+    Inv -.->|" MCP "| DB
 ```
+
+### Etapai
+
+| # | Etapas        | Agentas       | Kas vyksta                                                   | Rezultatas               |
+|---|---------------|---------------|--------------------------------------------------------------|--------------------------|
+| 1 | Planavimas    | Planuotojas   | Analizuoja bylą, klausinėja MCP visų subjektų, parenka temas | `dossier.md`, `plan.md`  |
+| 2 | Tyrimas       | Tyrėjai × N   | Kiekvienas vykdo vieną temą — MCP užklausos, išvadų rašymas  | `theme-NN-*.md`          |
+| 3 | Ataskaita     | Reporteris    | Sintezuoja visas išvadas, nustato tarptemines sąsajas        | `report.md`              |
+| 4 | Tech apžvalga | Tech Reviewer | Kategorizuoja MCP ir sistemos problemas                      | `tech-report-summary.md` |
+
+### Pagrindiniai dizaino sprendimai
+
+- Kiekvienas agentas = vienas `claude -p` subprocesas su `--tools "Read,Write,Edit"` (be Agent, be Bash)
+- MCP įrankiai pasiekiami natūraliai per projekto `.claude` konfigūraciją
+- `--max-budget-usd` riboja kainą kiekvienam etapui
+- Būsena saugoma `investigation-state.json` po kiekvieno žingsnio — pertrūkus, tęsia nuo kur sustojo
+- Temos gali būti vykdomos lygiagrečiai (`PARALLEL=true`)
+- Nulis runtime priklausomybių — naudoja tik `claude` CLI
+
+### Aplinkos kintamieji
+
+| Kintamasis            | Numatytoji reikšmė | Paskirtis                        |
+|-----------------------|--------------------|----------------------------------|
+| `MODEL`               | `sonnet`           | Claude modelio alias             |
+| `MAX_RETRIES`         | `3`                | Maks. bandymų skaičius per etapą |
+| `MAX_BUDGET_PER_STEP` | `5.0`              | Maks. USD per etapą              |
+| `PARALLEL`            | `false`            | Lygiagretus temų vykdymas        |
 
 ---
 
@@ -131,17 +137,39 @@ flowchart TD
 
 Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `YYYYMMDD_keyword`):
 
-| Failas                       | Parašo                              | Paskirtis                                                  |
-| ---------------------------- | ----------------------------------- | ---------------------------------------------------------- |
-| `case.md`                    | Vartotojas                          | Bylos aprašymas                                            |
-| `dossier.md`                 | Planuotojas                         | Bendri subjektų duomenys; visi agentai nuskaito            |
-| `plan.md`                    | Planuotojas                         | Parinktos temos ir temų užklausų planai                    |
-| `theme-NN-<name>.md`         | Tyrėjas (po vieną kiekvienai temai) | Temų išvados ir neapdoroti MCP duomenys                    |
-| `report.md`                  | Reporteris                          | Galutinė ataskaita su rekomendacijomis                     |
-| `tech-report.md`             | Visi agentai                        | MCP įrankių klaidos ir duomenų spragos (grįžtamasis ryšys) |
-| `tech-report-summary.md`     | Tech reviewer                       | Kategorizuotos techninės problemos                         |
-| `investigation.log`          | Orkestrantas                        | Pilnas orkestratoriaus žurnalas su laiko žymėmis            |
-| `investigation-state.json`   | Orkestrantas                        | Orchestracijos būsena (tęsimui)                            |
+| Failas                     | Parašo                              | Paskirtis                                                  |
+|----------------------------|-------------------------------------|------------------------------------------------------------|
+| `case.md`                  | Vartotojas                          | Bylos aprašymas                                            |
+| `dossier.md`               | Planuotojas                         | Bendri subjektų duomenys; visi agentai nuskaito            |
+| `plan.md`                  | Planuotojas                         | Parinktos temos ir temų užklausų planai                    |
+| `theme-NN-<name>.md`       | Tyrėjas (po vieną kiekvienai temai) | Temų išvados ir neapdoroti MCP duomenys                    |
+| `report.md`                | Reporteris                          | Galutinė ataskaita su rekomendacijomis                     |
+| `tech-report.md`           | Visi agentai                        | MCP įrankių klaidos ir duomenų spragos (grįžtamasis ryšys) |
+| `tech-report-summary.md`   | Tech reviewer                       | Kategorizuotos techninės problemos                         |
+| `investigation.log`        | Orkestrantas                        | Pilnas orkestratoriaus žurnalas su laiko žymėmis           |
+| `investigation-state.json` | Orkestrantas                        | Orchestracijos būsena (tęsimui)                            |
+
+---
+
+## Šaltinio kodas
+
+```
+src/
+  index.ts                ← CLI įėjimo taškas
+  help.ts                 ← CLI pagalbos tekstas
+  orchestrator.ts         ← pipeline: planuotojas → tyrėjai → reporteris → tech reviewer
+  agent-loop.ts           ← claude -p subprocesų valdymas (stream-json)
+  config.ts               ← aplinkos kintamųjų konfigūracija
+  types.ts                ← bendri tipai
+  agents/planner.ts       ← planuotojo agento funkcija
+  agents/investigator.ts  ← tyrėjo agento funkcija
+  agents/reporter.ts      ← reporterio agento funkcija
+  agents/tech-reviewer.ts ← tech report kategorizatorius
+  prompts/*.md            ← sistemos instrukcijos (pridedamos prie Claude Code numatytųjų)
+  io/workspace.ts         ← failų valdymo pagalbinės funkcijos
+  io/loader.ts            ← prompt failų skaitytuvas
+  io/logger.ts            ← dvigubas konsolė + failas loggeris
+```
 
 ---
 
@@ -150,33 +178,33 @@ Kiekviena byla saugoma aplanke `investigations/<case-id>/` (formatas: `YYYYMMDD_
 28 sukčiavimo aptikimo temos aplanke `docs/themes/`. Rodyklė ir MCP įrankių taisyklės:
 `docs/index/mcp-investigator-prompt.md`.
 
-| #   | Tema                                                                               | Pagrindiniai subjektai               |
-| --- | ---------------------------------------------------------------------------------- | ------------------------------------ |
-| 1   | Fiktyvios įmonės / pajėgumų neatitikimas                                           | įmonė, sutartis                      |
-| 2   | Pasiūlymų suokalbis / fiktyvūs konkurentai                                         | įmonė, konkursas                     |
-| 3   | Pasiūlymų rotacijos karuselė                                                       | įmonė, konkursas                     |
-| 4   | Interesų konfliktas — bendri asmenys tarp pirkėjo ir pardavėjo                     | asmuo, įmonė                         |
-| 5   | Sutarčių skaidymas siekiant išvengti ribų                                          | sutartis, konkursas                  |
-| 6   | Geografinė monopolija / vietinis užvaldymas                                        | įmonė, sutartis, pirkėjas            |
-| 7   | Procedūros manipuliavimas / nepagrįstas tiesioginis skyrimas                       | konkursas, sutartis, pirkėjas        |
-| 8   | Kainų anomalijos / permokėjimas / apimties plėtimas                                | sutartis                             |
-| 9   | Atitikties ir juodųjų sąrašų patikrinimas                                          | įmonė, asmuo, byla                   |
-| 10  | Tinklas — antros eilės ryšiai ir korporatyviniai tinklai                           | įmonė, asmuo                         |
-| 11  | UBO rizika — tikrasis savininkas per valdymo struktūrų sluoksnius                  | įmonė, asmuo                         |
-| 12  | ES struktūrinių fondų piktnaudžiavimas / fiktyvūs subrangovai                      | įmonė, sutartis                      |
-| 13  | Besisukančių durų efektas — pirkimų pareigūnas pereina pas laimėjusį tiekėją       | asmuo                                |
-| 14  | Specifikacijų suokalbis — techninės spec. rašomos vienam tiekėjui                  | įmonė, konkursas, pirkėjas           |
-| 15  | Pagrindų sutarties piktnaudžiavimas / vieno tiekėjo atšaukimai                     | įmonė, sutartis, pirkėjas            |
-| 16  | Bendras administracinis aparatas — konkuruojančios įmonės vienu adresu ar domenu   | įmonė                                |
-| 17  | Kainų kartelis — įtartinai vienodos pasiūlymų kainos                               | įmonė, konkursas                     |
-| 18  | Sutarties pakeitimų eskalacija — maža pasiūlymo kaina didinama pakeitimais         | sutartis, pirkėjas                   |
-| 19  | Savivaldybės įmonių favoritizmas — pirkėjas skiria sutartis savo dukterinei įmonei | įmonė, sutartis, pirkėjas            |
-| 20  | Riboto konkurso manipuliavimas — pirkėjas pats pasirenka kviečiamuosius            | konkursas, pirkėjas                  |
-| 21  | Politinių ryšių favoritizmas — įmonės susietos su partijų rėmėjais                 | asmuo, įmonė                         |
-| 22  | Fiktyvūs pristatymų aktai — sutartis pažymėta kaip įvykdyta, bet darbai neatlikti  | sutartis, byla                       |
-| 23  | Tiekėjo įkalinimas / esamo tiekėjo struktūrinė monopolija                          | įmonė, sutartis                      |
-| 24  | ES fondų pažeidimai ir tarpvalstybiniai sukčiavimo modeliai                        | įmonė, sutartis, byla                |
-| 25  | Pinigų plovimo požymiai pirkimų srautuose                                          | įmonė, asmuo, byla                   |
-| 26  | Sisteminiai vidinės kontrolės silpnumai pirkėjuose                                 | pirkėjas                             |
-| 27  | Sektoriui būdingi rizikos požymiai (sveikatos apsauga, statyba, IT)                | įmonė, sutartis, konkursas, pirkėjas |
-| 28  | Vieno dalyvio pirkimai — pagrindinis konkurencijos intensyvumo rodiklis            | konkursas, pirkėjas, įmonė           |
+| #  | Tema                                                                               | Pagrindiniai subjektai               |
+|----|------------------------------------------------------------------------------------|--------------------------------------|
+| 1  | Fiktyvios įmonės / pajėgumų neatitikimas                                           | įmonė, sutartis                      |
+| 2  | Pasiūlymų suokalbis / fiktyvūs konkurentai                                         | įmonė, konkursas                     |
+| 3  | Pasiūlymų rotacijos karuselė                                                       | įmonė, konkursas                     |
+| 4  | Interesų konfliktas — bendri asmenys tarp pirkėjo ir pardavėjo                     | asmuo, įmonė                         |
+| 5  | Sutarčių skaidymas siekiant išvengti ribų                                          | sutartis, konkursas                  |
+| 6  | Geografinė monopolija / vietinis užvaldymas                                        | įmonė, sutartis, pirkėjas            |
+| 7  | Procedūros manipuliavimas / nepagrįstas tiesioginis skyrimas                       | konkursas, sutartis, pirkėjas        |
+| 8  | Kainų anomalijos / permokėjimas / apimties plėtimas                                | sutartis                             |
+| 9  | Atitikties ir juodųjų sąrašų patikrinimas                                          | įmonė, asmuo, byla                   |
+| 10 | Tinklas — antros eilės ryšiai ir korporatyviniai tinklai                           | įmonė, asmuo                         |
+| 11 | UBO rizika — tikrasis savininkas per valdymo struktūrų sluoksnius                  | įmonė, asmuo                         |
+| 12 | ES struktūrinių fondų piktnaudžiavimas / fiktyvūs subrangovai                      | įmonė, sutartis                      |
+| 13 | Besisukančių durų efektas — pirkimų pareigūnas pereina pas laimėjusį tiekėją       | asmuo                                |
+| 14 | Specifikacijų suokalbis — techninės spec. rašomos vienam tiekėjui                  | įmonė, konkursas, pirkėjas           |
+| 15 | Pagrindų sutarties piktnaudžiavimas / vieno tiekėjo atšaukimai                     | įmonė, sutartis, pirkėjas            |
+| 16 | Bendras administracinis aparatas — konkuruojančios įmonės vienu adresu ar domenu   | įmonė                                |
+| 17 | Kainų kartelis — įtartinai vienodos pasiūlymų kainos                               | įmonė, konkursas                     |
+| 18 | Sutarties pakeitimų eskalacija — maža pasiūlymo kaina didinama pakeitimais         | sutartis, pirkėjas                   |
+| 19 | Savivaldybės įmonių favoritizmas — pirkėjas skiria sutartis savo dukterinei įmonei | įmonė, sutartis, pirkėjas            |
+| 20 | Riboto konkurso manipuliavimas — pirkėjas pats pasirenka kviečiamuosius            | konkursas, pirkėjas                  |
+| 21 | Politinių ryšių favoritizmas — įmonės susietos su partijų rėmėjais                 | asmuo, įmonė                         |
+| 22 | Fiktyvūs pristatymų aktai — sutartis pažymėta kaip įvykdyta, bet darbai neatlikti  | sutartis, byla                       |
+| 23 | Tiekėjo įkalinimas / esamo tiekėjo struktūrinė monopolija                          | įmonė, sutartis                      |
+| 24 | ES fondų pažeidimai ir tarpvalstybiniai sukčiavimo modeliai                        | įmonė, sutartis, byla                |
+| 25 | Pinigų plovimo požymiai pirkimų srautuose                                          | įmonė, asmuo, byla                   |
+| 26 | Sisteminiai vidinės kontrolės silpnumai pirkėjuose                                 | pirkėjas                             |
+| 27 | Sektoriui būdingi rizikos požymiai (sveikatos apsauga, statyba, IT)                | įmonė, sutartis, konkursas, pirkėjas |
+| 28 | Vieno dalyvio pirkimai — pagrindinis konkurencijos intensyvumo rodiklis            | konkursas, pirkėjas, įmonė           |
