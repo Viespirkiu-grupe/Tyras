@@ -1,22 +1,98 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import * as readline from "readline";
 import { log, logTool } from "./io/logger.js";
 
-const MCP_TOOLS = [
-  "mcp__viespirkiai-local__execute_query",
-  "mcp__viespirkiai-local__get_failas",
-  "mcp__viespirkiai-local__get_failas_tekstas",
-  "mcp__viespirkiai-local__get_juridinis",
-  "mcp__viespirkiai-local__get_pinreg_asmuo",
-  "mcp__viespirkiai-local__get_pinreg_jar",
-  "mcp__viespirkiai-local__get_schema",
-  "mcp__viespirkiai-local__get_sutartis",
-  "mcp__viespirkiai-local__get_viesasis_pirkimas",
-  "mcp__viespirkiai-local__search_failai",
-  "mcp__viespirkiai-local__search_juridiniai",
-  "mcp__viespirkiai-local__search_sutartys",
-  "mcp__viespirkiai-local__search_viesieji_pirkimai",
+const MCP_BASE_TOOLS = [
+  "execute_query",
+  "get_failas",
+  "get_failas_tekstas",
+  "get_juridinis",
+  "get_pinreg_asmuo",
+  "get_pinreg_jar",
+  "get_schema",
+  "get_sutartis",
+  "get_viesasis_pirkimas",
+  "search_failai",
+  "search_juridiniai",
+  "search_sutartys",
+  "search_viesieji_pirkimai",
 ];
+
+let _mcpPrefix: string | null = null;
+
+function detectMcpPrefix(): string {
+  if (_mcpPrefix !== null) return _mcpPrefix;
+
+  if (process.env.MCP_SERVER) {
+    const name = process.env.MCP_SERVER;
+    if (!name.toLowerCase().includes("viespirkiai")) {
+      throw new Error(
+        `MCP_SERVER="${name}" does not contain "viespirkiai". ` +
+          `Tyras requires a Viešpirkiai MCP server.`,
+      );
+    }
+    _mcpPrefix = `mcp__${name}__`;
+    return _mcpPrefix;
+  }
+
+  try {
+    const output = execSync("claude mcp list 2>&1", { encoding: "utf-8", timeout: 10_000 });
+    const lines = output.split("\n");
+    for (const line of lines) {
+      const match = line.match(/^(.+?):\s+https?:\/\/.+?-\s+.+Connected/);
+      if (match) {
+        const serverName = match[1].trim();
+        if (serverName.toLowerCase().includes("viespirkiai")) {
+          _mcpPrefix = `mcp__${serverName}__`;
+          return _mcpPrefix;
+        }
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  throw new Error(
+    "No connected MCP server with \"viespirkiai\" in its name was detected.\n" +
+      "Configure one via: claude mcp add <name> --transport http <url>\n" +
+      "Or set the MCP_SERVER environment variable.",
+  );
+}
+
+export async function preflightMcp(): Promise<void> {
+  const prefix = detectMcpPrefix();
+  const serverName = prefix.slice(5, -2); // strip "mcp__" and trailing "__"
+  const getSchemaTool = `${prefix}get_schema`;
+
+  try {
+    const output = execSync(
+      `claude -p --output-format json --no-session-persistence --tools "" --allowed-tools "${getSchemaTool}" "Call get_schema with no arguments and return the result exactly."`,
+      { encoding: "utf-8", timeout: 30_000 },
+    );
+    const result = JSON.parse(output);
+    if (result?.result && !result.result.includes("error")) {
+      return;
+    }
+    throw new Error(result?.result || "empty response");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Viešpirkiai database is not available via MCP server "${serverName}".\n` +
+        `The get_schema health check failed: ${msg}\n` +
+        `Verify the MCP server is running and the database is accessible.`,
+    );
+  }
+}
+
+function getMcpTools(): string[] {
+  const prefix = detectMcpPrefix();
+  return MCP_BASE_TOOLS.map((t) => `${prefix}${t}`);
+}
+
+function stripMcpPrefix(name: string): string {
+  const prefix = detectMcpPrefix();
+  return name.startsWith(prefix) ? name.slice(prefix.length) : name;
+}
 
 export interface AgentOptions {
   systemPrompt: string;
@@ -45,11 +121,11 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     enableMcp = true,
   } = options;
 
-  const builtinTools = ["Read", "Write", "Edit"];
+  const builtinTools = ["Read", "Write", "Edit", "WebSearch"];
 
   const allowedTools = [...builtinTools];
   if (enableMcp) {
-    allowedTools.push(...MCP_TOOLS);
+    allowedTools.push(...getMcpTools());
   }
 
   const args = [
@@ -154,7 +230,7 @@ function formatShort(name: string, input: Record<string, unknown>, cwd: string):
   if (name === "Write") return `📝 Write ${shortenPath(input.file_path as string, cwd)}`;
   if (name === "Edit") return `✏️  Edit ${shortenPath(input.file_path as string, cwd)}`;
 
-  const tool = name.replace("mcp__viespirkiai-local__", "");
+  const tool = stripMcpPrefix(name);
 
   if (tool === "execute_query") {
     const sql = normalize((input.query as string) || "");
@@ -173,7 +249,7 @@ function formatShort(name: string, input: Record<string, unknown>, cwd: string):
 }
 
 function formatVerbose(name: string, input: Record<string, unknown>, cwd: string): string {
-  const tool = name.replace("mcp__viespirkiai-local__", "");
+  const tool = stripMcpPrefix(name);
   const args = Object.entries(input)
     .filter(([k]) => k !== "content" && k !== "old_string" && k !== "new_string")
     .map(([k, v]) => {

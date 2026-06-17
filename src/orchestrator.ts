@@ -4,6 +4,7 @@ import { runPlanner } from "./agents/planner.js";
 import { runInvestigator } from "./agents/investigator.js";
 import { runReporter } from "./agents/reporter.js";
 import { runTechReviewer } from "./agents/tech-reviewer.js";
+import { preflightMcp } from "./agent-loop.js";
 import * as workspace from "./io/workspace.js";
 import { initLogger, log, warn } from "./io/logger.js";
 import { CONFIG } from "./config.js";
@@ -31,6 +32,10 @@ export async function investigate(caseId: string): Promise<void> {
     console.log(`     npm run investigate ${caseId}\n`);
     return;
   }
+
+  console.log("\n  🔌 Checking MCP connection...");
+  await preflightMcp();
+  console.log("  ✅ MCP connection verified.\n");
 
   const casePrompt = await workspace.readFile(caseMd);
   const saved = (await workspace.loadState(caseDir)) as InvestigationState | null;
