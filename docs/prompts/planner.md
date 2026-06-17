@@ -33,7 +33,7 @@ This is the only place entity lookups happen. Investigator agents will NOT repea
 
 ### 4. Write the dossier
 
-Use the Write tool to create `investigations/<case-id>/dossier.md` with this structure:
+Use the Write tool to create `{{CASE_DIR}}/dossier.md` with this structure:
 
 ```markdown
 # Investigation Dossier — <Case ID>
@@ -81,7 +81,7 @@ Use the Write tool to create `investigations/<case-id>/dossier.md` with this str
 
 ### 5. Select themes and write the plan
 
-Use the Write tool to create `investigations/<case-id>/plan.md` with selected themes. For each:
+Use the Write tool to create `{{CASE_DIR}}/plan.md` with selected themes. For each:
 
 - One-line rationale tied to this case
 - Priority: High / Medium / Low
@@ -100,15 +100,15 @@ End your final text response with a fenced JSON block containing the structured 
 
 ```json
 {
-  "caseId": "20260617_kelme",
-  "dossierPath": "investigations/20260617_kelme/dossier.md",
-  "planPath": "investigations/20260617_kelme/plan.md",
+  "caseId": "{{CASE_ID}}",
+  "dossierPath": "{{CASE_DIR}}/dossier.md",
+  "planPath": "{{CASE_DIR}}/plan.md",
   "themes": [
     {
       "index": 1,
       "name": "shell-company",
       "themeDocument": "docs/themes/1-shell-company-or-capacity-mismatch.md",
-      "outputPath": "investigations/20260617_kelme/theme-01-shell-company.md",
+      "outputPath": "{{CASE_DIR}}/theme-01-shell-company.md",
       "priority": "High"
     }
   ]

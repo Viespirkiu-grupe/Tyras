@@ -101,22 +101,6 @@ Use the Edit tool on the dossier to append under `## Theme Findings Summary`:
 
 Append MCP tool issues per CLAUDE.md tech-report rules.
 
-### 8. Return handoff
-
-End your final text response with a fenced JSON block:
-
-```json
-{
-  "themeIndex": 2,
-  "status": "complete",
-  "nextThemeIndex": 3,
-  "keyFindings": [
-    "finding 1",
-    "finding 2"
-  ]
-}
-```
-
 ## Rules
 
 - Read the dossier AND all prior theme files before any MCP query.

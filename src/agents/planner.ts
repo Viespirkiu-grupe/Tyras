@@ -1,15 +1,18 @@
 import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
-import { loadPrompt } from "../io/loader.js";
+import { loadPromptTemplate, fillVars } from "../io/loader.js";
 import type { PlannerHandoff, StepResult } from "../types.js";
 
-const systemPrompt = loadPrompt("planner");
+const promptTemplate = loadPromptTemplate("planner");
 
 export async function runPlanner(
   casePrompt: string,
   caseId: string,
   model: string,
 ): Promise<{ handoff: PlannerHandoff; step: StepResult }> {
+  const caseDir = `investigations/${caseId}`;
+  const systemPrompt = fillVars(promptTemplate, { CASE_ID: caseId, CASE_DIR: caseDir });
+
   const userMessage = `## Investigation Case
 
 **Case ID:** ${caseId}

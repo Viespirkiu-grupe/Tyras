@@ -1,10 +1,10 @@
 import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
-import { loadPrompt } from "../io/loader.js";
+import { loadPromptTemplate } from "../io/loader.js";
 import type { StepResult } from "../types.js";
 import { listThemeFiles } from "../io/workspace.js";
 
-const systemPrompt = loadPrompt("reporter");
+const systemPrompt = loadPromptTemplate("reporter");
 
 export async function runReporter(
   caseId: string,

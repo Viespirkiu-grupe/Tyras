@@ -1,16 +1,18 @@
 import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
-import { loadPrompt } from "../io/loader.js";
+import { loadPromptTemplate, fillVars } from "../io/loader.js";
 import type { StepResult } from "../types.js";
 import { readFile, fileExists } from "../io/workspace.js";
 
-const systemPrompt = loadPrompt("tech-reviewer");
+const promptTemplate = loadPromptTemplate("tech-reviewer");
 
 export async function runTechReviewer(
   caseId: string,
   caseDir: string,
   model: string,
 ): Promise<{ step: StepResult }> {
+  const systemPrompt = fillVars(promptTemplate, { CASE_DIR: caseDir });
+
   const techReportPath = `${caseDir}/tech-report.md`;
   let techReport = "";
   if (await fileExists(techReportPath)) {

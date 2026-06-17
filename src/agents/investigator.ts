@@ -1,9 +1,9 @@
 import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
-import { loadPrompt } from "../io/loader.js";
+import { loadPromptTemplate } from "../io/loader.js";
 import type { InvestigatorInputs, StepResult } from "../types.js";
 
-const systemPrompt = loadPrompt("investigator");
+const systemPrompt = loadPromptTemplate("investigator");
 
 export async function runInvestigator(
   inputs: InvestigatorInputs,
