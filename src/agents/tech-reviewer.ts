@@ -29,6 +29,8 @@ export async function runTechReviewer(
 
 ${techReport || "No tech report found — write a summary noting that no technical issues were reported."}`;
 
+  const outputPath = `${caseDir}/tech-report-summary.md`;
+
   const result = await runAgent({
     systemPrompt,
     userMessage,
@@ -36,6 +38,12 @@ ${techReport || "No tech report found — write a summary noting that no technic
     agentName: "tech-reviewer",
     enableMcp: false,
   });
+
+  if (!(await fileExists(outputPath))) {
+    throw new Error(
+      `tech-reviewer finished (${result.numTurns} turns, ${formatDuration(result.durationMs)}) but output file missing: ${outputPath}`,
+    );
+  }
 
   const step: StepResult = {
     stepName: "tech-reviewer",

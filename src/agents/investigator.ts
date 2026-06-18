@@ -1,6 +1,7 @@
 import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
 import { loadPromptTemplate } from "../io/loader.js";
+import { fileExists } from "../io/workspace.js";
 import type { InvestigatorInputs, StepResult } from "../types.js";
 
 const systemPrompt = loadPromptTemplate("investigator");
@@ -57,6 +58,12 @@ All context is provided above. Do NOT re-read these files. Proceed directly to r
     agentName: `investigator-${inputs.themeIndex}`,
     enableMcp: true,
   });
+
+  if (!(await fileExists(inputs.outputPath))) {
+    throw new Error(
+      `investigator-${inputs.themeIndex} finished (${result.numTurns} turns, ${formatDuration(result.durationMs)}) but output file missing: ${inputs.outputPath}`,
+    );
+  }
 
   const step: StepResult = {
     stepName: `theme-${String(inputs.themeIndex).padStart(2, "0")}-${inputs.themeName}`,

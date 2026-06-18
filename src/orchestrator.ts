@@ -4,9 +4,9 @@ import { runPlanner } from "./agents/planner.js";
 import { runInvestigator } from "./agents/investigator.js";
 import { runReporter } from "./agents/reporter.js";
 import { runTechReviewer } from "./agents/tech-reviewer.js";
-import { preflightMcp } from "./agent-loop.js";
+import { preflightMcp, QuotaExhaustedError } from "./agent-loop.js";
 import * as workspace from "./io/workspace.js";
-import { initLogger, log, warn } from "./io/logger.js";
+import { initLogger, log, warn, error } from "./io/logger.js";
 import { CONFIG } from "./config.js";
 import { formatDuration, formatDateTime } from "./io/format.js";
 import type { InvestigationState, InvestigatorInputs, StepResult, PlannerHandoff } from "./types.js";
@@ -294,12 +294,30 @@ async function runThemesParallel(
 
 async function withRetry<T>(name: string, fn: () => Promise<T>): Promise<T> {
   let lastError: Error | undefined;
-  for (let attempt = 1; attempt <= CONFIG.maxRetries; attempt++) {
+  let quotaAttempts = 0;
+
+  for (let attempt = 1; ; attempt++) {
     try {
       return await fn();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < CONFIG.maxRetries) {
+      const isQuota = err instanceof QuotaExhaustedError;
+
+      if (isQuota) {
+        quotaAttempts++;
+        if (quotaAttempts >= CONFIG.quotaMaxRetries) {
+          error(`  ❌ [${name}] quota exhausted after ${quotaAttempts} retries — giving up`);
+          throw lastError;
+        }
+        const delay = Math.min(
+          CONFIG.quotaBaseDelayMs * Math.pow(2, quotaAttempts - 1),
+          CONFIG.quotaMaxDelayMs,
+        );
+        warn(`  ⚠️  [${name}] quota exhausted (attempt ${quotaAttempts}/${CONFIG.quotaMaxRetries}): session had only 1 turn`);
+        warn(`  ⏳ waiting ${Math.round(delay / 1000)}s for quota reset...`);
+        await sleep(delay);
+      } else {
+        if (attempt >= CONFIG.maxRetries) throw lastError;
         const delay = Math.min(30_000 * Math.pow(2, attempt - 1), 120_000);
         warn(`  ⚠️  [${name}] attempt ${attempt} failed: ${lastError.message}`);
         warn(`  ⏳ retrying in ${delay / 1000}s...`);
@@ -307,7 +325,6 @@ async function withRetry<T>(name: string, fn: () => Promise<T>): Promise<T> {
       }
     }
   }
-  throw lastError!;
 }
 
 function recordStep(state: InvestigationState, step: StepResult): void {

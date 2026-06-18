@@ -2,7 +2,7 @@ import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
 import { loadPromptTemplate } from "../io/loader.js";
 import type { StepResult } from "../types.js";
-import { listThemeFiles } from "../io/workspace.js";
+import { listThemeFiles, fileExists } from "../io/workspace.js";
 
 const systemPrompt = loadPromptTemplate("reporter");
 
@@ -33,6 +33,8 @@ Read all source documents first, then write the report incrementally:
 
 This ensures partial progress is saved even if something fails mid-way.`;
 
+  const reportPath = `${caseDir}/report.md`;
+
   const result = await runAgent({
     systemPrompt,
     userMessage,
@@ -40,6 +42,12 @@ This ensures partial progress is saved even if something fails mid-way.`;
     agentName: "reporter",
     enableMcp: false,
   });
+
+  if (!(await fileExists(reportPath))) {
+    throw new Error(
+      `reporter finished (${result.numTurns} turns, ${formatDuration(result.durationMs)}) but output file missing: ${reportPath}`,
+    );
+  }
 
   const step: StepResult = {
     stepName: "reporter",

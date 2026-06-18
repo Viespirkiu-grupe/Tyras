@@ -18,6 +18,22 @@ const MCP_BASE_TOOLS = [
   "search_viesieji_pirkimai",
 ];
 
+export class QuotaExhaustedError extends Error {
+  numTurns: number;
+  durationMs: number;
+
+  constructor(agentName: string, numTurns: number, durationMs: number, stderr: string) {
+    const hint = stderr.trim() ? ` | stderr: ${stderr.trim().slice(0, 300)}` : "";
+    super(`[${agentName}] session quota exhausted — ${numTurns} turn(s), ${durationMs}ms${hint}`);
+    this.name = "QuotaExhaustedError";
+    this.numTurns = numTurns;
+    this.durationMs = durationMs;
+  }
+}
+
+const HOLLOW_SESSION_MAX_TURNS = 1;
+const HOLLOW_SESSION_MAX_MS = 5_000;
+
 let _mcpPrefix: string | null = null;
 
 function detectMcpPrefix(): string {
@@ -201,6 +217,11 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         reject(
           new Error(`[${agentName}] claude exited with code ${code}: ${stderr.slice(0, 500)}`),
         );
+        return;
+      }
+
+      if (numTurns <= HOLLOW_SESSION_MAX_TURNS && durationMs < HOLLOW_SESSION_MAX_MS) {
+        reject(new QuotaExhaustedError(agentName, numTurns, durationMs, stderr));
         return;
       }
 

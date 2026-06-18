@@ -7,9 +7,19 @@ export function initLogger(caseDir: string): void {
   logPath = path.join(caseDir, "investigation.log");
 }
 
+function localTimestamp(): string {
+  const now = new Date();
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const pad3 = (n: number) => String(n).padStart(3, "0");
+  return (
+    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ` +
+    `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}.${pad3(now.getMilliseconds())}`
+  );
+}
+
 function write(level: string, message: string): void {
   if (logPath) {
-    appendFileSync(logPath, `${new Date().toISOString()} [${level}] ${message}\n`);
+    appendFileSync(logPath, `${localTimestamp()} [${level}] ${message}\n`);
   }
 }
 
