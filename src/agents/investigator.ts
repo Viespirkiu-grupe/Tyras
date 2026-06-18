@@ -1,10 +1,10 @@
 import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
-import { loadPromptTemplate } from "../io/loader.js";
+import { loadPromptTemplate, fillVars } from "../io/loader.js";
 import { fileExists } from "../io/workspace.js";
 import type { InvestigatorInputs, StepResult } from "../types.js";
 
-const systemPrompt = loadPromptTemplate("investigator");
+const promptTemplate = loadPromptTemplate("investigator");
 
 export async function runInvestigator(
   inputs: InvestigatorInputs,
@@ -50,6 +50,8 @@ ${inputs.themeDocContent}
 ---
 
 All context is provided above. Do NOT re-read these files. Proceed directly to running theme-specific MCP queries and writing your findings.`;
+
+  const systemPrompt = fillVars(promptTemplate, { CASE_ID: inputs.caseId, CASE_DIR: inputs.caseDir });
 
   const result = await runAgent({
     systemPrompt,

@@ -1,10 +1,10 @@
 import { runAgent } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
-import { loadPromptTemplate } from "../io/loader.js";
+import { loadPromptTemplate, fillVars } from "../io/loader.js";
 import type { StepResult } from "../types.js";
 import { listThemeFiles, fileExists } from "../io/workspace.js";
 
-const systemPrompt = loadPromptTemplate("reporter");
+const promptTemplate = loadPromptTemplate("reporter");
 
 export async function runReporter(
   caseId: string,
@@ -34,6 +34,8 @@ Read all source documents first, then write the report incrementally:
 This ensures partial progress is saved even if something fails mid-way.`;
 
   const reportPath = `${caseDir}/report.md`;
+
+  const systemPrompt = fillVars(promptTemplate, { CASE_ID: caseId, CASE_DIR: caseDir });
 
   const result = await runAgent({
     systemPrompt,

@@ -92,7 +92,7 @@ Use the Edit tool on the dossier to append under `## Theme Findings Summary`:
 
 ### 5. Append to tech-report.md
 
-Append MCP tool issues per CLAUDE.md tech-report rules.
+Append MCP tool issues to `{{CASE_DIR}}/tech-report.md` per CLAUDE.md tech-report rules.
 
 ## Rules
 
