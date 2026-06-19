@@ -44,6 +44,7 @@ export interface StepResult {
   error?: string;
   retries: number;
   numTurns: number;
+  tokenUsage?: TokenUsage;
 }
 
 export interface InvestigationState {

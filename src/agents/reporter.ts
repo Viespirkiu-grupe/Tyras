@@ -59,6 +59,7 @@ This ensures partial progress is saved even if something fails mid-way.`;
     success: true,
     retries: 0,
     numTurns: result.numTurns,
+    tokenUsage: result.tokenUsage,
   };
 
   return { step };

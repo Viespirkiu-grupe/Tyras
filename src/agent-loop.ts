@@ -1,6 +1,7 @@
 import { spawn, execSync } from "child_process";
 import * as readline from "readline";
-import { log, logTool } from "./io/logger.js";
+import { log, logTool, logTokens } from "./io/logger.js";
+import type { TokenUsage } from "./types.js";
 
 const MCP_BASE_TOOLS = [
   "execute_query",
@@ -208,6 +209,7 @@ export interface AgentResult {
   durationMs: number;
   numTurns: number;
   sessionId: string;
+  tokenUsage: TokenUsage;
 }
 
 export async function runAgent(options: AgentOptions): Promise<AgentResult> {
@@ -263,12 +265,45 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     let errorMsg = "";
     let stderr = "";
 
+    let turnIndex = 0;
+    let prevCtxTokens = 0;
+    let cumInputTokens = 0;
+    let cumOutputTokens = 0;
+    let cumCacheRead = 0;
+    let cumCacheCreate = 0;
+
     const rl = readline.createInterface({ input: proc.stdout! });
 
     rl.on("line", (line) => {
       if (!line.trim()) return;
       try {
         const msg = JSON.parse(line);
+
+        if (msg.type === "assistant" && msg.message?.usage) {
+          turnIndex++;
+          const u = msg.message.usage;
+          const input = u.input_tokens ?? 0;
+          const output = u.output_tokens ?? 0;
+          const cacheRead = u.cache_read_input_tokens ?? 0;
+          const cacheCreate = u.cache_creation_input_tokens ?? 0;
+          const ctx = input + cacheRead + cacheCreate;
+
+          const growth = turnIndex === 1
+            ? "(initial)"
+            : `(+${ctx - prevCtxTokens})`;
+
+          logTokens(
+            `turn ${turnIndex} | ctx: ${ctx} ${growth} | out: ${output} | cache: ${cacheRead}r ${cacheCreate}w`,
+            tag,
+          );
+
+          prevCtxTokens = ctx;
+          cumInputTokens += input;
+          cumOutputTokens += output;
+          cumCacheRead += cacheRead;
+          cumCacheCreate += cacheCreate;
+        }
+
         logToolCall(msg, cwd, tag);
 
         if (msg.type === "result") {
@@ -309,7 +344,19 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         return;
       }
 
-      resolve({ text: finalResult, costUsd, durationMs, numTurns, sessionId });
+      const tokenUsage: TokenUsage = {
+        inputTokens: cumInputTokens,
+        outputTokens: cumOutputTokens,
+        cacheReadTokens: cumCacheRead,
+        cacheCreationTokens: cumCacheCreate,
+      };
+
+      logTokens(
+        `total | in: ${cumInputTokens} | out: ${cumOutputTokens} | cache: ${cumCacheRead}r ${cumCacheCreate}w | peak_ctx: ${prevCtxTokens}`,
+        tag,
+      );
+
+      resolve({ text: finalResult, costUsd, durationMs, numTurns, sessionId, tokenUsage });
     });
 
     proc.on("error", (err) => {

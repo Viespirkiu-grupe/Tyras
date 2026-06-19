@@ -400,7 +400,9 @@ function recordStep(state: InvestigationState, step: StepResult): void {
 
   const dur = formatDuration(step.durationMs);
   if (step.success) {
-    log(`  ✅ ${step.stepName} — ${dur}, ${step.numTurns} turns`);
+    const tkn = step.tokenUsage;
+    const tknInfo = tkn ? `, ${fmtK(tkn.inputTokens + tkn.cacheReadTokens + tkn.cacheCreationTokens)} in, ${fmtK(tkn.outputTokens)} out` : "";
+    log(`  ✅ ${step.stepName} — ${dur}, ${step.numTurns} turns${tknInfo}`);
   } else {
     log(`  ❌ ${step.stepName} — FAILED: ${step.error}`);
   }
@@ -419,10 +421,25 @@ function printSummary(state: InvestigationState): void {
   log("");
   log("   Step Breakdown:");
   log("   ─────────────────────────────────────────────");
+  let grandIn = 0, grandOut = 0, grandCacheR = 0, grandCacheW = 0;
   for (const step of state.steps) {
     const icon = step.success ? "✅" : "❌";
     const dur = formatDuration(step.durationMs).padStart(6);
-    log(`   ${icon} ${step.stepName.padEnd(35)} ${dur}  ${step.numTurns} turns`);
+    const tkn = step.tokenUsage;
+    const tknCol = tkn
+      ? `  ${fmtK(tkn.inputTokens + tkn.cacheReadTokens + tkn.cacheCreationTokens).padStart(6)} in ${fmtK(tkn.outputTokens).padStart(5)} out`
+      : "";
+    log(`   ${icon} ${step.stepName.padEnd(35)} ${dur}  ${String(step.numTurns).padStart(3)} turns${tknCol}`);
+    if (tkn) {
+      grandIn += tkn.inputTokens;
+      grandOut += tkn.outputTokens;
+      grandCacheR += tkn.cacheReadTokens;
+      grandCacheW += tkn.cacheCreationTokens;
+    }
+  }
+  if (grandIn + grandOut > 0) {
+    log("   ─────────────────────────────────────────────");
+    log(`   Tokens total: ${fmtK(grandIn + grandCacheR + grandCacheW)} in (${fmtK(grandCacheR)} cached), ${fmtK(grandOut)} out`);
   }
   log("═══════════════════════════════════════════════");
 }
@@ -443,6 +460,12 @@ function formatDocuments(caseDir: string): void {
   } catch {
     warn("  ⚠️  Prettier formatting failed — continuing");
   }
+}
+
+function fmtK(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
 
 function sleep(ms: number): Promise<void> {

@@ -43,6 +43,7 @@ Begin by reading the theme index at docs/index/mcp-investigator-prompt.md, then 
     success: true,
     retries: 0,
     numTurns: result.numTurns,
+    tokenUsage: result.tokenUsage,
   };
 
   return { handoff, step };

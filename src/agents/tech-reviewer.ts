@@ -53,6 +53,7 @@ ${techReport || "No tech report found — write a summary noting that no technic
     success: true,
     retries: 0,
     numTurns: result.numTurns,
+    tokenUsage: result.tokenUsage,
   };
 
   return { step };

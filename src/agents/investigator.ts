@@ -75,6 +75,7 @@ All context is provided above. Do NOT re-read these files. Proceed directly to r
     success: true,
     retries: 0,
     numTurns: result.numTurns,
+    tokenUsage: result.tokenUsage,
   };
 
   return { step };
