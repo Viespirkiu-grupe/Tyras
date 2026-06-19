@@ -245,7 +245,8 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
   args.push(userMessage);
 
-  log(`  🟢 ${agentName} starting...`);
+  const tag = agentShortTag(agentName);
+  log(`  🟢 ${agentName} starting...`, tag);
 
   return new Promise<AgentResult>((resolve, reject) => {
     const proc = spawn("claude", args, {
@@ -268,7 +269,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       if (!line.trim()) return;
       try {
         const msg = JSON.parse(line);
-        logToolCall(msg, cwd);
+        logToolCall(msg, cwd, tag);
 
         if (msg.type === "result") {
           if (msg.subtype === "success") {
@@ -317,7 +318,15 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   });
 }
 
-function logToolCall(msg: any, cwd: string): void {
+function agentShortTag(agentName: string): string {
+  const match = agentName.match(/^(investigator|planner|reporter|tech-reviewer)(?:-(\d+))?$/);
+  if (!match) return agentName;
+  const [, role, num] = match;
+  const prefix = role === "investigator" ? "I" : role === "planner" ? "P" : role === "reporter" ? "R" : "T";
+  return `${prefix}-${num || "1"}`;
+}
+
+function logToolCall(msg: any, cwd: string, tag: string): void {
   if (msg.type !== "assistant" || !msg.message?.content) return;
   for (const block of msg.message.content) {
     if (block.type !== "tool_use") continue;
@@ -325,7 +334,7 @@ function logToolCall(msg: any, cwd: string): void {
     const input = block.input ?? {};
     const short = formatShort(name, input, cwd);
     const verbose = formatVerbose(name, input, cwd);
-    logTool(`     ${short}`, verbose);
+    logTool(`     ${short}`, verbose, tag);
   }
 }
 

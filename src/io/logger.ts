@@ -17,30 +17,32 @@ function localTimestamp(): string {
   );
 }
 
-function write(level: string, message: string): void {
-  if (logPath) {
-    appendFileSync(logPath, `${localTimestamp()} [${level}] ${message}\n`);
-  }
+function write(level: string, message: string, tag?: string): void {
+  if (!logPath) return;
+  const stripped = message.trim();
+  if (!stripped) return;
+  const tagStr = tag ? `[${tag}]` : "";
+  appendFileSync(logPath, `${localTimestamp()} [${level}]${tagStr} ${stripped}\n`);
 }
 
-export function log(message: string): void {
+export function log(message: string, tag?: string): void {
   console.log(message);
-  write("INFO", stripEmoji(message));
+  write("INFO", stripEmoji(message), tag);
 }
 
-export function warn(message: string): void {
+export function warn(message: string, tag?: string): void {
   console.warn(message);
-  write("WARN", stripEmoji(message));
+  write("WARN", stripEmoji(message), tag);
 }
 
-export function error(message: string): void {
+export function error(message: string, tag?: string): void {
   console.error(message);
-  write("ERROR", stripEmoji(message));
+  write("ERROR", stripEmoji(message), tag);
 }
 
-export function logTool(consoleLine: string, verboseLine: string): void {
+export function logTool(consoleLine: string, verboseLine: string, tag?: string): void {
   console.log(consoleLine);
-  write("TOOL", verboseLine);
+  write("TOOL", verboseLine, tag);
 }
 
 function stripEmoji(s: string): string {
