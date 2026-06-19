@@ -1,11 +1,10 @@
 import { investigate } from "./orchestrator.js";
-import { HELP_TEXT } from "./help.js";
 
 async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args.includes("--help")) {
-    console.log(HELP_TEXT);
+    console.log("Usage: `npm run investigate 20260617_tyrimas`");
     process.exit(0);
   }
 

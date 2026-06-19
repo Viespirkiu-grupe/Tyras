@@ -24,7 +24,6 @@ vi.mock("../../io/workspace.js", () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fileExists: (...args: any[]) => mockFileExists(...args),
   readFile: vi.fn().mockResolvedValue(""),
-  listThemeFiles: vi.fn().mockResolvedValue([]),
 }));
 
 import { InvestigatorAgent, runInvestigator } from "../investigator.js";
@@ -42,7 +41,6 @@ function makeInputs(overrides: Partial<InvestigatorInputs> = {}): InvestigatorIn
     nextThemeIndex: 4,
     dossierContent: "Dossier content here",
     themeDocContent: "Theme doc content",
-    priorFindings: [],
     ...overrides,
   };
 }
@@ -90,26 +88,17 @@ describe("InvestigatorAgent", () => {
     });
   });
 
-  it("buildUserMessage formats prior findings when present", () => {
-    const agent = new InvestigatorAgent(
-      makeInputs({
-        priorFindings: [
-          { path: "theme-01.md", content: "Finding A" },
-          { path: "theme-02.md", content: "Finding B" },
-        ],
-      }),
-    );
+  it("buildUserMessage includes dossier content as shared context", () => {
+    const agent = new InvestigatorAgent(makeInputs({ dossierContent: "Entity summary here" }));
     const msg = agent.buildUserMessage();
-    expect(msg).toContain("### Prior findings: theme-01.md");
-    expect(msg).toContain("Finding A");
-    expect(msg).toContain("### Prior findings: theme-02.md");
-    expect(msg).toContain("Finding B");
+    expect(msg).toContain("## Shared Dossier");
+    expect(msg).toContain("Entity summary here");
   });
 
-  it("buildUserMessage shows placeholder when no prior findings", () => {
-    const agent = new InvestigatorAgent(makeInputs({ priorFindings: [] }));
+  it("buildUserMessage instructs to use Read for prior theme details", () => {
+    const agent = new InvestigatorAgent(makeInputs());
     const msg = agent.buildUserMessage();
-    expect(msg).toContain("(no prior theme findings yet");
+    expect(msg).toContain("use the Read tool");
   });
 
   it("buildUserMessage marks last theme when nextThemeIndex is 0", () => {

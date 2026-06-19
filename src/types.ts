@@ -25,7 +25,6 @@ export interface InvestigatorInputs {
   nextThemeIndex: number;
   dossierContent: string;
   themeDocContent: string;
-  priorFindings: { path: string; content: string }[];
 }
 
 export interface TokenUsage {

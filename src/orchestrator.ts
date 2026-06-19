@@ -172,21 +172,6 @@ async function buildInvestigatorInputs(
   const dossierContent = await workspace.readFile(plan.dossierPath);
   const themeDocContent = await workspace.readFile(theme.themeDocument);
 
-  const allThemeFiles = await workspace.listThemeFiles(state.caseDir);
-  const priorFiles = allThemeFiles.filter((f) => {
-    const m = f.match(/^theme-(\d+)/);
-    return m && parseInt(m[1], 10) < theme.index;
-  });
-  const priorFindings: { path: string; content: string }[] = [];
-  for (const f of priorFiles) {
-    const fullPath = `${state.caseDir}/${f}`;
-    try {
-      priorFindings.push({ path: fullPath, content: await workspace.readFile(fullPath) });
-    } catch {
-      // file may have been removed between listing and reading
-    }
-  }
-
   return {
     caseId: state.caseId,
     caseDir: state.caseDir,
@@ -199,7 +184,6 @@ async function buildInvestigatorInputs(
     nextThemeIndex,
     dossierContent,
     themeDocContent,
-    priorFindings,
   };
 }
 

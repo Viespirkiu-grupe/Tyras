@@ -26,13 +26,6 @@ export class InvestigatorAgent extends FileOutputAgent {
   }
 
   buildUserMessage(): string {
-    const priorFindingsBlock =
-      this.inputs.priorFindings.length > 0
-        ? this.inputs.priorFindings
-            .map((f) => `### Prior findings: ${f.path}\n\n${f.content}`)
-            .join("\n\n---\n\n")
-        : "(no prior theme findings yet — you are the first theme)";
-
     return `## Theme Investigation Assignment
 
 **Case ID:** ${this.inputs.caseId}
@@ -52,12 +45,6 @@ ${this.inputs.dossierContent}
 
 ---
 
-## Prior Theme Findings
-
-${priorFindingsBlock}
-
----
-
 ## Theme Document: ${this.inputs.themeName}
 
 Source: ${this.inputs.themeDocument}
@@ -66,7 +53,7 @@ ${this.inputs.themeDocContent}
 
 ---
 
-All context is provided above. Do NOT re-read these files. Proceed directly to running theme-specific MCP queries and writing your findings.`;
+The dossier above contains summaries of all prior theme findings. If you need full details from a specific prior theme, use the Read tool on its file. Proceed directly to running theme-specific MCP queries and writing your findings.`;
   }
 }
 
