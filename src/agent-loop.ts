@@ -68,7 +68,6 @@ export async function probeQuota(model: string): Promise<QuotaProbeResult> {
       "-p",
       "--output-format", "json",
       "--model", model,
-      "--max-tokens", "5",
       "--no-session-persistence",
     ], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -93,8 +92,7 @@ export async function probeQuota(model: string): Promise<QuotaProbeResult> {
       try {
         const result = JSON.parse(stdout);
         const turns = result.num_turns ?? 0;
-        const duration = result.duration_ms ?? 0;
-        if (code === 0 && turns >= 1 && duration >= HOLLOW_SESSION_MAX_MS) {
+        if (code === 0 && turns >= 1) {
           resolve({ available: true, retryAfterMs: null, stderr });
           return;
         }
@@ -166,8 +164,8 @@ export async function preflightMcp(): Promise<void> {
 
   try {
     const output = execSync(
-      `echo "Call get_schema with no arguments and return the result exactly." | claude -p --output-format json --no-session-persistence --tools "" --allowed-tools "${getSchemaTool}"`,
-      { encoding: "utf-8", timeout: 90_000 },
+      `echo 'Call get_schema with table="v_company" and return the result exactly.' | claude -p --output-format json --no-session-persistence --tools "" --allowed-tools "${getSchemaTool}"`,
+      { encoding: "utf-8", timeout: 30_000 },
     );
     const result = JSON.parse(output);
     if (result?.result && !result.result.includes("error")) {

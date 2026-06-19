@@ -18,7 +18,7 @@ rekomendacijomis dėl susisiekimo su priežiūros institucijoms kaip STT, FNTT, 
 4. Atidarykite terminalą, eikite į šio repozitoriaus šakninį aplanką `Tyras/` ir paleiskite:
 
 ```bash
-npm run investigate 20260617_sveikata
+npm run investigate 20260620_kam_v2
 ```
 
 5. Sukuriamas failas `investigations/20260617_sveikata/case.md` — atidarykite jį ir aprašykite tyrimo atvejį, pvz.:
