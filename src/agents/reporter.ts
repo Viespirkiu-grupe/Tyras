@@ -1,29 +1,41 @@
-import { runAgent } from "../agent-loop.js";
-import { formatDuration } from "../io/format.js";
-import { loadPromptTemplate, fillVars } from "../io/loader.js";
+import { FileOutputAgent } from "./base-agent.js";
+import { listThemeFiles } from "../io/workspace.js";
 import type { StepResult } from "../types.js";
-import { listThemeFiles, fileExists } from "../io/workspace.js";
 
-const promptTemplate = loadPromptTemplate("reporter");
+export class ReporterAgent extends FileOutputAgent {
+  readonly templateName = "reporter";
+  readonly stepName = "reporter";
+  readonly agentName = "reporter";
 
-export async function runReporter(
-  caseId: string,
-  caseDir: string,
-  model: string,
-): Promise<{ step: StepResult }> {
-  const themeFiles = await listThemeFiles(caseDir);
-  const themeFileList = themeFiles.map((f) => `- ${caseDir}/${f}`).join("\n");
+  constructor(
+    private readonly caseId: string,
+    private readonly caseDir: string,
+  ) {
+    super();
+  }
 
-  const userMessage = `## Report Writing Assignment
+  get outputPath(): string {
+    return `${this.caseDir}/report.md`;
+  }
 
-**Case ID:** ${caseId}
-**Date:** ${new Date().toISOString().split("T")[0]}
-**Report output path:** ${caseDir}/report.md
+  getTemplateVars(): Record<string, string> {
+    return { CASE_ID: this.caseId, CASE_DIR: this.caseDir };
+  }
+
+  async buildUserMessage(): Promise<string> {
+    const themeFiles = await listThemeFiles(this.caseDir);
+    const themeFileList = themeFiles.map((f) => `- ${this.caseDir}/${f}`).join("\n");
+
+    return `## Report Writing Assignment
+
+**Case ID:** ${this.caseId}
+**Date:** ${this.todayDate()}
+**Report output path:** ${this.caseDir}/report.md
 
 ### Source documents to read (in order):
 
-1. **Dossier:** ${caseDir}/dossier.md
-2. **Plan:** ${caseDir}/plan.md
+1. **Dossier:** ${this.caseDir}/dossier.md
+2. **Plan:** ${this.caseDir}/plan.md
 3. **Theme findings (read in order):**
 ${themeFileList}
 
@@ -32,35 +44,13 @@ Read all source documents first, then write the report incrementally:
 - Use the Edit tool to append each subsequent section
 
 This ensures partial progress is saved even if something fails mid-way.`;
-
-  const reportPath = `${caseDir}/report.md`;
-
-  const systemPrompt = fillVars(promptTemplate, { CASE_ID: caseId, CASE_DIR: caseDir });
-
-  const result = await runAgent({
-    systemPrompt,
-    userMessage,
-    model,
-    agentName: "reporter",
-    enableMcp: false,
-  });
-
-  if (!(await fileExists(reportPath))) {
-    throw new Error(
-      `reporter finished (${result.numTurns} turns, ${formatDuration(result.durationMs)}) but output file missing: ${reportPath}`,
-    );
   }
+}
 
-  const step: StepResult = {
-    stepName: "reporter",
-    durationMs: result.durationMs,
-    duration: formatDuration(result.durationMs),
-    costUsd: result.costUsd,
-    success: true,
-    retries: 0,
-    numTurns: result.numTurns,
-    tokenUsage: result.tokenUsage,
-  };
-
-  return { step };
+export async function runReporter(
+  caseId: string,
+  caseDir: string,
+  model: string,
+): Promise<{ step: StepResult }> {
+  return new ReporterAgent(caseId, caseDir).run(model);
 }

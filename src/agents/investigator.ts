@@ -1,37 +1,54 @@
-import { runAgent } from "../agent-loop.js";
-import { formatDuration } from "../io/format.js";
-import { loadPromptTemplate, fillVars } from "../io/loader.js";
-import { fileExists } from "../io/workspace.js";
+import { FileOutputAgent } from "./base-agent.js";
 import type { InvestigatorInputs, StepResult } from "../types.js";
 
-const promptTemplate = loadPromptTemplate("investigator");
+export class InvestigatorAgent extends FileOutputAgent {
+  readonly templateName = "investigator";
+  override readonly enableMcp = true;
 
-export async function runInvestigator(
-  inputs: InvestigatorInputs,
-  model: string,
-): Promise<{ step: StepResult }> {
-  const priorFindingsBlock = inputs.priorFindings.length > 0
-    ? inputs.priorFindings.map((f) =>
-        `### Prior findings: ${f.path}\n\n${f.content}`
-      ).join("\n\n---\n\n")
-    : "(no prior theme findings yet — you are the first theme)";
+  constructor(private readonly inputs: InvestigatorInputs) {
+    super();
+  }
 
-  const userMessage = `## Theme Investigation Assignment
+  get stepName(): string {
+    return `theme-${String(this.inputs.themeIndex).padStart(2, "0")}-${this.inputs.themeName}`;
+  }
 
-**Case ID:** ${inputs.caseId}
-**Date:** ${new Date().toISOString().split("T")[0]}
-**Theme index:** ${inputs.themeIndex}
-**Theme name:** ${inputs.themeName}
-**Output path:** ${inputs.outputPath}
-**Dossier path:** ${inputs.dossierPath}
-**Plan path:** ${inputs.planPath}
-**Next theme index:** ${inputs.nextThemeIndex} ${inputs.nextThemeIndex === 0 ? "(you are the LAST theme)" : ""}
+  get agentName(): string {
+    return `investigator-${this.inputs.themeIndex}`;
+  }
+
+  get outputPath(): string {
+    return this.inputs.outputPath;
+  }
+
+  getTemplateVars(): Record<string, string> {
+    return { CASE_ID: this.inputs.caseId, CASE_DIR: this.inputs.caseDir };
+  }
+
+  buildUserMessage(): string {
+    const priorFindingsBlock =
+      this.inputs.priorFindings.length > 0
+        ? this.inputs.priorFindings
+            .map((f) => `### Prior findings: ${f.path}\n\n${f.content}`)
+            .join("\n\n---\n\n")
+        : "(no prior theme findings yet — you are the first theme)";
+
+    return `## Theme Investigation Assignment
+
+**Case ID:** ${this.inputs.caseId}
+**Date:** ${this.todayDate()}
+**Theme index:** ${this.inputs.themeIndex}
+**Theme name:** ${this.inputs.themeName}
+**Output path:** ${this.inputs.outputPath}
+**Dossier path:** ${this.inputs.dossierPath}
+**Plan path:** ${this.inputs.planPath}
+**Next theme index:** ${this.inputs.nextThemeIndex} ${this.inputs.nextThemeIndex === 0 ? "(you are the LAST theme)" : ""}
 
 ---
 
 ## Shared Dossier
 
-${inputs.dossierContent}
+${this.inputs.dossierContent}
 
 ---
 
@@ -41,42 +58,21 @@ ${priorFindingsBlock}
 
 ---
 
-## Theme Document: ${inputs.themeName}
+## Theme Document: ${this.inputs.themeName}
 
-Source: ${inputs.themeDocument}
+Source: ${this.inputs.themeDocument}
 
-${inputs.themeDocContent}
+${this.inputs.themeDocContent}
 
 ---
 
 All context is provided above. Do NOT re-read these files. Proceed directly to running theme-specific MCP queries and writing your findings.`;
-
-  const systemPrompt = fillVars(promptTemplate, { CASE_ID: inputs.caseId, CASE_DIR: inputs.caseDir });
-
-  const result = await runAgent({
-    systemPrompt,
-    userMessage,
-    model,
-    agentName: `investigator-${inputs.themeIndex}`,
-    enableMcp: true,
-  });
-
-  if (!(await fileExists(inputs.outputPath))) {
-    throw new Error(
-      `investigator-${inputs.themeIndex} finished (${result.numTurns} turns, ${formatDuration(result.durationMs)}) but output file missing: ${inputs.outputPath}`,
-    );
   }
+}
 
-  const step: StepResult = {
-    stepName: `theme-${String(inputs.themeIndex).padStart(2, "0")}-${inputs.themeName}`,
-    durationMs: result.durationMs,
-    duration: formatDuration(result.durationMs),
-    costUsd: result.costUsd,
-    success: true,
-    retries: 0,
-    numTurns: result.numTurns,
-    tokenUsage: result.tokenUsage,
-  };
-
-  return { step };
+export async function runInvestigator(
+  inputs: InvestigatorInputs,
+  model: string,
+): Promise<{ step: StepResult }> {
+  return new InvestigatorAgent(inputs).run(model);
 }
