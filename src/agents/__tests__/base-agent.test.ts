@@ -1,29 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { AgentResult } from "../../agent-loop.js";
+import { MockWorkspace } from "../../io/mock-workspace.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRunAgent = vi.fn();
 
 vi.mock("../../agent-loop.js", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runAgent: (...args: any[]) => mockRunAgent(...args),
-}));
-
-vi.mock("../../io/loader.js", () => ({
-  loadPromptTemplate: vi.fn().mockReturnValue("System {{CASE_ID}} {{CASE_DIR}}"),
-  fillVars: vi.fn((template: string, vars: Record<string, string>) =>
-    template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`),
-  ),
-}));
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockFileExists = vi.fn();
-
-vi.mock("../../io/workspace.js", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fileExists: (...args: any[]) => mockFileExists(...args),
-  readFile: vi.fn().mockResolvedValue(""),
-  listThemeFiles: vi.fn().mockResolvedValue([]),
 }));
 
 import { BaseAgent, FileOutputAgent } from "../base-agent.js";
@@ -42,6 +24,12 @@ const MOCK_RESULT: AgentResult = {
     cacheCreationTokens: 100,
   },
 };
+
+function makeWorkspace() {
+  const ws = new MockWorkspace();
+  ws.prompts.set("test", "System {{CASE_ID}} {{CASE_DIR}}");
+  return ws;
+}
 
 class TestAgent extends BaseAgent {
   readonly templateName = "test";
@@ -74,12 +62,11 @@ class TestFileAgent extends FileOutputAgent {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRunAgent.mockResolvedValue(MOCK_RESULT);
-  mockFileExists.mockResolvedValue(true);
 });
 
 describe("BaseAgent", () => {
   it("passes correct AgentOptions to runAgent", async () => {
-    const agent = new TestAgent();
+    const agent = new TestAgent(makeWorkspace());
     await agent.run("sonnet");
 
     expect(mockRunAgent).toHaveBeenCalledWith({
@@ -92,7 +79,7 @@ describe("BaseAgent", () => {
   });
 
   it("builds correct StepResult from AgentResult", async () => {
-    const agent = new TestAgent();
+    const agent = new TestAgent(makeWorkspace());
     const { step } = await agent.run("sonnet");
 
     expect(step).toEqual({
@@ -114,12 +101,12 @@ describe("BaseAgent", () => {
       }
     }
 
-    const agent = new FailingAgent();
+    const agent = new FailingAgent(makeWorkspace());
     await expect(agent.run("sonnet")).rejects.toThrow("validation failed");
   });
 
   it("todayDate returns YYYY-MM-DD format", () => {
-    const agent = new TestAgent();
+    const agent = new TestAgent(makeWorkspace());
     const date = agent["todayDate"]();
     expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
@@ -132,11 +119,11 @@ describe("BaseAgent", () => {
       getTemplateVars() { return {}; }
       buildUserMessage() { return ""; }
     }
-    expect(new NoMcpAgent().enableMcp).toBe(false);
+    expect(new NoMcpAgent(makeWorkspace()).enableMcp).toBe(false);
   });
 
   it("buildSystemPrompt uses fillVars with template vars", () => {
-    const agent = new TestAgent();
+    const agent = new TestAgent(makeWorkspace());
     const prompt = agent.buildSystemPrompt();
     expect(prompt).toBe("System c-1 investigations/c-1");
   });
@@ -144,15 +131,15 @@ describe("BaseAgent", () => {
 
 describe("FileOutputAgent", () => {
   it("passes when output file exists", async () => {
-    mockFileExists.mockResolvedValue(true);
-    const agent = new TestFileAgent();
+    const ws = makeWorkspace();
+    await ws.writeFile("investigations/c-1/output.md", "content");
+    const agent = new TestFileAgent(ws);
     const { step } = await agent.run("sonnet");
     expect(step.success).toBe(true);
   });
 
   it("throws with descriptive error when output file missing", async () => {
-    mockFileExists.mockResolvedValue(false);
-    const agent = new TestFileAgent();
+    const agent = new TestFileAgent(makeWorkspace());
 
     await expect(agent.run("sonnet")).rejects.toThrow(
       /file-agent finished \(3 turns, .+\) but output file missing: investigations\/c-1\/output\.md/,

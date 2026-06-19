@@ -1,5 +1,6 @@
 import { BaseAgent } from "./base-agent.js";
 import type { AgentResult } from "../agent-loop.js";
+import type { IWorkspace } from "../io/workspace.js";
 import type { PlannerHandoff, StepResult } from "../types.js";
 
 export interface PlannerResult {
@@ -16,10 +17,11 @@ export class PlannerAgent extends BaseAgent<PlannerResult> {
   private _handoff: PlannerHandoff | null = null;
 
   constructor(
+    workspace: IWorkspace,
     private readonly casePrompt: string,
     private readonly caseId: string,
   ) {
-    super();
+    super(workspace);
   }
 
   private get caseDir(): string {
@@ -71,9 +73,10 @@ Begin by reading the theme index at docs/index/mcp-investigator-prompt.md, then 
 }
 
 export async function runPlanner(
+  workspace: IWorkspace,
   casePrompt: string,
   caseId: string,
   model: string,
 ): Promise<{ handoff: PlannerHandoff; step: StepResult }> {
-  return new PlannerAgent(casePrompt, caseId).run(model);
+  return new PlannerAgent(workspace, casePrompt, caseId).run(model);
 }

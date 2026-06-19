@@ -1,5 +1,5 @@
 import { FileOutputAgent } from "./base-agent.js";
-import { listThemeFiles } from "../io/workspace.js";
+import type { IWorkspace } from "../io/workspace.js";
 import type { StepResult } from "../types.js";
 
 export class ReporterAgent extends FileOutputAgent {
@@ -8,10 +8,11 @@ export class ReporterAgent extends FileOutputAgent {
   readonly agentName = "reporter";
 
   constructor(
+    workspace: IWorkspace,
     private readonly caseId: string,
     private readonly caseDir: string,
   ) {
-    super();
+    super(workspace);
   }
 
   get outputPath(): string {
@@ -23,7 +24,7 @@ export class ReporterAgent extends FileOutputAgent {
   }
 
   async buildUserMessage(): Promise<string> {
-    const themeFiles = await listThemeFiles(this.caseDir);
+    const themeFiles = await this.workspace.listThemeFiles(this.caseDir);
     const themeFileList = themeFiles.map((f) => `- ${this.caseDir}/${f}`).join("\n");
 
     return `## Report Writing Assignment
@@ -48,9 +49,10 @@ This ensures partial progress is saved even if something fails mid-way.`;
 }
 
 export async function runReporter(
+  workspace: IWorkspace,
   caseId: string,
   caseDir: string,
   model: string,
 ): Promise<{ step: StepResult }> {
-  return new ReporterAgent(caseId, caseDir).run(model);
+  return new ReporterAgent(workspace, caseId, caseDir).run(model);
 }

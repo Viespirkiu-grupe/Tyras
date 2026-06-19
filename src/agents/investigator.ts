@@ -1,12 +1,16 @@
 import { FileOutputAgent } from "./base-agent.js";
+import type { IWorkspace } from "../io/workspace.js";
 import type { InvestigatorInputs, StepResult } from "../types.js";
 
 export class InvestigatorAgent extends FileOutputAgent {
   readonly templateName = "investigator";
   override readonly enableMcp = true;
 
-  constructor(private readonly inputs: InvestigatorInputs) {
-    super();
+  constructor(
+    workspace: IWorkspace,
+    private readonly inputs: InvestigatorInputs,
+  ) {
+    super(workspace);
   }
 
   get stepName(): string {
@@ -58,8 +62,9 @@ The dossier above contains summaries of all prior theme findings. If you need fu
 }
 
 export async function runInvestigator(
+  workspace: IWorkspace,
   inputs: InvestigatorInputs,
   model: string,
 ): Promise<{ step: StepResult }> {
-  return new InvestigatorAgent(inputs).run(model);
+  return new InvestigatorAgent(workspace, inputs).run(model);
 }

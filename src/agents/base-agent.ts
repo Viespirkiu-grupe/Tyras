@@ -1,8 +1,8 @@
 import { runAgent } from "../agent-loop.js";
 import type { AgentResult } from "../agent-loop.js";
 import { formatDuration } from "../io/format.js";
-import { loadPromptTemplate, fillVars } from "../io/loader.js";
-import { fileExists } from "../io/workspace.js";
+import type { IWorkspace } from "../io/workspace.js";
+import { fillVars } from "../io/workspace.js";
 import type { StepResult } from "../types.js";
 
 export interface AgentRunResult {
@@ -12,9 +12,11 @@ export interface AgentRunResult {
 export abstract class BaseAgent<TResult extends AgentRunResult = AgentRunResult> {
   private _promptTemplate: string | null = null;
 
+  constructor(protected readonly workspace: IWorkspace) {}
+
   protected get promptTemplate(): string {
     if (this._promptTemplate === null) {
-      this._promptTemplate = loadPromptTemplate(this.templateName);
+      this._promptTemplate = this.workspace.loadPromptTemplate(this.templateName);
     }
     return this._promptTemplate;
   }
@@ -74,7 +76,7 @@ export abstract class FileOutputAgent extends BaseAgent {
   abstract readonly outputPath: string;
 
   protected override async validateOutput(result: AgentResult): Promise<void> {
-    if (!(await fileExists(this.outputPath))) {
+    if (!(await this.workspace.fileExists(this.outputPath))) {
       throw new Error(
         `${this.agentName} finished (${result.numTurns} turns, ${formatDuration(result.durationMs)}) but output file missing: ${this.outputPath}`,
       );

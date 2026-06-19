@@ -1,5 +1,5 @@
 import { FileOutputAgent } from "./base-agent.js";
-import { readFile, fileExists } from "../io/workspace.js";
+import type { IWorkspace } from "../io/workspace.js";
 import type { StepResult } from "../types.js";
 
 export class TechReviewerAgent extends FileOutputAgent {
@@ -8,10 +8,11 @@ export class TechReviewerAgent extends FileOutputAgent {
   readonly agentName = "tech-reviewer";
 
   constructor(
+    workspace: IWorkspace,
     private readonly caseId: string,
     private readonly caseDir: string,
   ) {
-    super();
+    super(workspace);
   }
 
   get outputPath(): string {
@@ -25,8 +26,8 @@ export class TechReviewerAgent extends FileOutputAgent {
   async buildUserMessage(): Promise<string> {
     const techReportPath = `${this.caseDir}/tech-report.md`;
     let techReport = "";
-    if (await fileExists(techReportPath)) {
-      techReport = await readFile(techReportPath);
+    if (await this.workspace.fileExists(techReportPath)) {
+      techReport = await this.workspace.readFile(techReportPath);
     }
 
     return `## Tech Report Review
@@ -42,9 +43,10 @@ ${techReport || "No tech report found — write a summary noting that no technic
 }
 
 export async function runTechReviewer(
+  workspace: IWorkspace,
   caseId: string,
   caseDir: string,
   model: string,
 ): Promise<{ step: StepResult }> {
-  return new TechReviewerAgent(caseId, caseDir).run(model);
+  return new TechReviewerAgent(workspace, caseId, caseDir).run(model);
 }

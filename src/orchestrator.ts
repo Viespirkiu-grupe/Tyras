@@ -5,7 +5,8 @@ import { runInvestigator } from "./agents/investigator.js";
 import { runReporter } from "./agents/reporter.js";
 import { runTechReviewer } from "./agents/tech-reviewer.js";
 import { preflightMcp, QuotaExhaustedError, probeQuota, parseResetTime } from "./agent-loop.js";
-import * as workspace from "./io/workspace.js";
+import { Workspace } from "./io/workspace.js";
+import type { IWorkspace } from "./io/workspace.js";
 import { initLogger, log, warn, error } from "./io/logger.js";
 import { CONFIG } from "./config.js";
 import { formatDuration, formatDateTime } from "./io/format.js";
@@ -21,8 +22,9 @@ Describe the case here. Include:
 - Any specific concerns or leads
 `;
 
-export async function investigate(caseId: string): Promise<void> {
-  const caseDir = await workspace.createWorkspace(caseId);
+export async function investigate(caseId: string, ws?: IWorkspace): Promise<void> {
+  const workspace = ws ?? new Workspace();
+  const caseDir = await workspace.createCaseDir(caseId);
   const caseMd = workspace.caseMdPath(caseDir);
 
   if (!(await workspace.fileExists(caseMd))) {
@@ -48,7 +50,7 @@ export async function investigate(caseId: string): Promise<void> {
     log(`   Case:  ${caseId}`);
     log(`   Status: ${saved.status}, ${saved.completedThemes.length} themes done`);
     log("");
-    await runPipeline(caseId, caseDir, casePrompt, saved);
+    await runPipeline(workspace, caseId, caseDir, casePrompt, saved);
     return;
   }
 
@@ -81,10 +83,11 @@ export async function investigate(caseId: string): Promise<void> {
     startDateTime: formatDateTime(new Date()),
   };
 
-  await runPipeline(caseId, caseDir, casePrompt, state);
+  await runPipeline(workspace, caseId, caseDir, casePrompt, state);
 }
 
 async function runPipeline(
+  workspace: IWorkspace,
   caseId: string,
   caseDir: string,
   casePrompt: string,
@@ -96,7 +99,7 @@ async function runPipeline(
     log("");
     await ensureQuotaAvailable("planner");
     const { handoff, step } = await withRetry("planner", () =>
-      runPlanner(casePrompt, caseId, CONFIG.model),
+      runPlanner(workspace, casePrompt, caseId, CONFIG.model),
     );
     plan = handoff;
     state.plan = plan;
@@ -122,9 +125,9 @@ async function runPipeline(
     const pendingThemes = plan.themes.filter((t) => !state.completedThemes.includes(t.index));
 
     if (CONFIG.parallelThemes) {
-      await runThemesParallel(plan, pendingThemes, state);
+      await runThemesParallel(workspace, plan, pendingThemes, state);
     } else {
-      await runThemesSequential(plan, pendingThemes, state);
+      await runThemesSequential(workspace, plan, pendingThemes, state);
     }
 
     state.status = "reporting";
@@ -137,7 +140,7 @@ async function runPipeline(
     log("");
     await ensureQuotaAvailable("reporter");
     const { step } = await withRetry("reporter", () =>
-      runReporter(caseId, caseDir, CONFIG.model),
+      runReporter(workspace, caseId, caseDir, CONFIG.model),
     );
     recordStep(state, step);
     formatDocuments(caseDir);
@@ -151,7 +154,7 @@ async function runPipeline(
     log("");
     await ensureQuotaAvailable("tech-reviewer");
     const { step } = await withRetry("tech-reviewer", () =>
-      runTechReviewer(caseId, caseDir, CONFIG.model),
+      runTechReviewer(workspace, caseId, caseDir, CONFIG.model),
     );
     recordStep(state, step);
     formatDocuments(caseDir);
@@ -164,6 +167,7 @@ async function runPipeline(
 }
 
 async function buildInvestigatorInputs(
+  workspace: IWorkspace,
   plan: PlannerHandoff,
   theme: PlannerHandoff["themes"][number],
   nextThemeIndex: number,
@@ -188,6 +192,7 @@ async function buildInvestigatorInputs(
 }
 
 async function runThemesSequential(
+  workspace: IWorkspace,
   plan: PlannerHandoff,
   themes: PlannerHandoff["themes"],
   state: InvestigationState,
@@ -200,10 +205,10 @@ async function runThemesSequential(
 
     await ensureQuotaAvailable(`investigator-${theme.index}`);
 
-    const inputs = await buildInvestigatorInputs(plan, theme, nextThemeIndex, state);
+    const inputs = await buildInvestigatorInputs(workspace, plan, theme, nextThemeIndex, state);
 
     const { step } = await withRetry(`investigator-${theme.index}`, () =>
-      runInvestigator(inputs, CONFIG.model),
+      runInvestigator(workspace, inputs, CONFIG.model),
     );
     recordStep(state, step);
     formatDocuments(state.caseDir);
@@ -214,6 +219,7 @@ async function runThemesSequential(
 }
 
 async function runThemesParallel(
+  workspace: IWorkspace,
   plan: PlannerHandoff,
   themes: PlannerHandoff["themes"],
   state: InvestigationState,
@@ -223,10 +229,10 @@ async function runThemesParallel(
   if (first) {
     log(`  📌 Theme ${first.index}: ${first.name} [sequential baseline]`);
     const inputs = await buildInvestigatorInputs(
-      plan, first, rest.length > 0 ? rest[0].index : 0, state,
+      workspace, plan, first, rest.length > 0 ? rest[0].index : 0, state,
     );
     const { step } = await withRetry(`investigator-${first.index}`, () =>
-      runInvestigator(inputs, CONFIG.model),
+      runInvestigator(workspace, inputs, CONFIG.model),
     );
     recordStep(state, step);
     formatDocuments(state.caseDir);
@@ -247,14 +253,14 @@ async function runThemesParallel(
       batch.map((theme, i) => {
         const globalIdx = batchStart + i;
         const nextIdx = globalIdx + 1 < rest.length ? rest[globalIdx + 1].index : 0;
-        return buildInvestigatorInputs(plan, theme, nextIdx, state);
+        return buildInvestigatorInputs(workspace, plan, theme, nextIdx, state);
       }),
     );
 
     const results = await Promise.allSettled(
       batchInputs.map((inputs) =>
         withRetry(`investigator-${inputs.themeIndex}`, () =>
-          runInvestigator(inputs, CONFIG.model),
+          runInvestigator(workspace, inputs, CONFIG.model),
         ),
       ),
     );
@@ -354,21 +360,23 @@ async function ensureQuotaAvailable(stepName: string): Promise<void> {
   }
 }
 
-async function withRetry<T>(name: string, fn: () => Promise<T>): Promise<T> {
+export async function withRetry<T>(name: string, fn: () => Promise<T>): Promise<T> {
   let lastError: Error | undefined;
+  let attempt = 0;
 
-  for (let attempt = 1; ; attempt++) {
+  for (;;) {
     try {
       return await fn();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
 
       if (err instanceof QuotaExhaustedError) {
-        warn(`  ⚠️  [${name}] quota exhausted on attempt ${attempt}. Switching to probe-wait mode.`);
+        warn(`  ⚠️  [${name}] quota exhausted. Switching to probe-wait mode.`);
         await waitForQuotaResetShared(name, err);
         continue;
       }
 
+      attempt++;
       if (attempt >= CONFIG.maxRetries) throw lastError;
       const delay = Math.min(30_000 * Math.pow(2, attempt - 1), 120_000);
       warn(`  ⚠️  [${name}] attempt ${attempt} failed: ${lastError.message}`);
@@ -378,7 +386,7 @@ async function withRetry<T>(name: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function recordStep(state: InvestigationState, step: StepResult): void {
+export function recordStep(state: InvestigationState, step: StepResult): void {
   state.steps.push(step);
   state.totalCostUsd += step.costUsd;
 
@@ -392,7 +400,7 @@ function recordStep(state: InvestigationState, step: StepResult): void {
   }
 }
 
-function printSummary(state: InvestigationState): void {
+export function printSummary(state: InvestigationState): void {
   const totalMs = Date.now() - state.startTime;
 
   log("═══════════════════════════════════════════════");
