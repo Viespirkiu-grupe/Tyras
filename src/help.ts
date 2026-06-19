@@ -13,9 +13,11 @@ Prerequisites:
   - MCP server viespirkiai-local configured in .claude settings
 
 Environment variables:
-  MODEL                Model alias (default: sonnet). Use opus, haiku, etc.
-  MAX_RETRIES          Max retries per step (default: 3)
-  PARALLEL             Enable parallel theme execution (default: false)
+  MODEL                     Model alias (default: sonnet). Use opus, haiku, etc.
+  MAX_RETRIES               Max retries per step for non-quota errors (default: 3)
+  PARALLEL                  Enable parallel theme execution (default: false)
+  QUOTA_PROBE_INTERVAL_MS   How often to probe quota during wait (default: 300000 = 5min)
+  QUOTA_MAX_WAIT_MS         Max time to wait for quota reset (default: 28800000 = 8hr)
 
 Pipeline:
   1. Planner       — parses case, queries MCP for entities, selects themes

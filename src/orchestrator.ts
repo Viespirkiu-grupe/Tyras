@@ -4,7 +4,7 @@ import { runPlanner } from "./agents/planner.js";
 import { runInvestigator } from "./agents/investigator.js";
 import { runReporter } from "./agents/reporter.js";
 import { runTechReviewer } from "./agents/tech-reviewer.js";
-import { preflightMcp, QuotaExhaustedError } from "./agent-loop.js";
+import { preflightMcp, QuotaExhaustedError, probeQuota, parseResetTime } from "./agent-loop.js";
 import * as workspace from "./io/workspace.js";
 import { initLogger, log, warn, error } from "./io/logger.js";
 import { CONFIG } from "./config.js";
@@ -94,6 +94,7 @@ async function runPipeline(
   if (state.status === "planning") {
     log("📋 Phase 1: Planning");
     log("");
+    await ensureQuotaAvailable("planner");
     const { handoff, step } = await withRetry("planner", () =>
       runPlanner(casePrompt, caseId, CONFIG.model),
     );
@@ -134,6 +135,7 @@ async function runPipeline(
   if (state.status === "reporting") {
     log("📊 Phase 3: Report");
     log("");
+    await ensureQuotaAvailable("reporter");
     const { step } = await withRetry("reporter", () =>
       runReporter(caseId, caseDir, CONFIG.model),
     );
@@ -147,6 +149,7 @@ async function runPipeline(
   if (state.status === "tech-review") {
     log("🔧 Phase 4: Tech Review");
     log("");
+    await ensureQuotaAvailable("tech-reviewer");
     const { step } = await withRetry("tech-reviewer", () =>
       runTechReviewer(caseId, caseDir, CONFIG.model),
     );
@@ -211,6 +214,8 @@ async function runThemesSequential(
 
     log(`  📌 Theme ${theme.index}/${plan.themes.length}: ${theme.name} [${theme.priority}]`);
 
+    await ensureQuotaAvailable(`investigator-${theme.index}`);
+
     const inputs = await buildInvestigatorInputs(plan, theme, nextThemeIndex, state);
 
     const { step } = await withRetry(`investigator-${theme.index}`, () =>
@@ -249,6 +254,9 @@ async function runThemesParallel(
   const BATCH_SIZE = 3;
   for (let batchStart = 0; batchStart < rest.length; batchStart += BATCH_SIZE) {
     const batch = rest.slice(batchStart, batchStart + BATCH_SIZE);
+
+    await ensureQuotaAvailable(`batch-${batch.map((t) => t.index).join(",")}`);
+
     log(`  ⚡ Parallel batch: themes ${batch.map((t) => t.index).join(", ")}`);
 
     const batchInputs = await Promise.all(
@@ -292,37 +300,96 @@ async function runThemesParallel(
   }
 }
 
+let _quotaWaitPromise: Promise<void> | null = null;
+
+async function waitForQuotaReset(
+  stepName: string,
+  initialError: QuotaExhaustedError,
+): Promise<void> {
+  const resetMs = parseResetTime(initialError.stderr);
+  if (resetMs && resetMs > 0) {
+    const waitMs = resetMs + 60_000;
+    log(`  ⏳ [${stepName}] quota resets in ${formatDuration(resetMs)}. Sleeping ${formatDuration(waitMs)}...`);
+    await sleep(waitMs);
+    return;
+  }
+
+  const startWait = Date.now();
+  let probeCount = 0;
+
+  while (Date.now() - startWait < CONFIG.quotaMaxWaitMs) {
+    probeCount++;
+    const intervalMin = Math.round(CONFIG.quotaProbeIntervalMs / 60_000);
+    log(`  ⏳ [${stepName}] waiting ${intervalMin}min then probing... (probe #${probeCount})`);
+    await sleep(CONFIG.quotaProbeIntervalMs);
+
+    const probe = await probeQuota(CONFIG.model);
+    if (probe.available) {
+      log(`  ✅ [${stepName}] quota available after ${formatDuration(Date.now() - startWait)}`);
+      return;
+    }
+
+    if (probe.retryAfterMs && probe.retryAfterMs > 0) {
+      const waitMs = probe.retryAfterMs + 60_000;
+      log(`  ⏳ [${stepName}] API says retry in ${formatDuration(probe.retryAfterMs)}. Sleeping ${formatDuration(waitMs)}...`);
+      await sleep(waitMs);
+      return;
+    }
+
+    log(`  ⏳ [${stepName}] still rate-limited. Waited ${formatDuration(Date.now() - startWait)} total.`);
+  }
+
+  throw new Error(
+    `[${stepName}] quota not restored after ${formatDuration(CONFIG.quotaMaxWaitMs)}. Giving up.`,
+  );
+}
+
+async function waitForQuotaResetShared(
+  stepName: string,
+  initialError: QuotaExhaustedError,
+): Promise<void> {
+  if (_quotaWaitPromise) {
+    log(`  ⏳ [${stepName}] joining existing quota wait...`);
+    await _quotaWaitPromise;
+    return;
+  }
+  _quotaWaitPromise = waitForQuotaReset(stepName, initialError);
+  try {
+    await _quotaWaitPromise;
+  } finally {
+    _quotaWaitPromise = null;
+  }
+}
+
+async function ensureQuotaAvailable(stepName: string): Promise<void> {
+  const probe = await probeQuota(CONFIG.model);
+  if (!probe.available) {
+    warn(`  ⚠️  [${stepName}] quota not available before step. Waiting for reset...`);
+    const syntheticErr = new QuotaExhaustedError(stepName, 0, 0, probe.stderr);
+    await waitForQuotaReset(stepName, syntheticErr);
+  }
+}
+
 async function withRetry<T>(name: string, fn: () => Promise<T>): Promise<T> {
   let lastError: Error | undefined;
-  let quotaAttempts = 0;
 
   for (let attempt = 1; ; attempt++) {
     try {
       return await fn();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      const isQuota = err instanceof QuotaExhaustedError;
 
-      if (isQuota) {
-        quotaAttempts++;
-        if (quotaAttempts >= CONFIG.quotaMaxRetries) {
-          error(`  ❌ [${name}] quota exhausted after ${quotaAttempts} retries — giving up`);
-          throw lastError;
-        }
-        const delay = Math.min(
-          CONFIG.quotaBaseDelayMs * Math.pow(2, quotaAttempts - 1),
-          CONFIG.quotaMaxDelayMs,
-        );
-        warn(`  ⚠️  [${name}] quota exhausted (attempt ${quotaAttempts}/${CONFIG.quotaMaxRetries}): session had only 1 turn`);
-        warn(`  ⏳ waiting ${Math.round(delay / 1000)}s for quota reset...`);
-        await sleep(delay);
-      } else {
-        if (attempt >= CONFIG.maxRetries) throw lastError;
-        const delay = Math.min(30_000 * Math.pow(2, attempt - 1), 120_000);
-        warn(`  ⚠️  [${name}] attempt ${attempt} failed: ${lastError.message}`);
-        warn(`  ⏳ retrying in ${delay / 1000}s...`);
-        await sleep(delay);
+      if (err instanceof QuotaExhaustedError) {
+        warn(`  ⚠️  [${name}] quota exhausted on attempt ${attempt}. Switching to probe-wait mode.`);
+        await waitForQuotaResetShared(name, err);
+        continue;
       }
+
+      if (attempt >= CONFIG.maxRetries) throw lastError;
+      const delay = Math.min(30_000 * Math.pow(2, attempt - 1), 120_000);
+      warn(`  ⚠️  [${name}] attempt ${attempt} failed: ${lastError.message}`);
+      warn(`  ⏳ retrying in ${delay / 1000}s...`);
+      await sleep(delay);
     }
   }
 }
@@ -333,7 +400,7 @@ function recordStep(state: InvestigationState, step: StepResult): void {
 
   const dur = formatDuration(step.durationMs);
   if (step.success) {
-    log(`  ✅ ${step.stepName} — ${dur}, $${step.costUsd.toFixed(4)}, ${step.numTurns} turns`);
+    log(`  ✅ ${step.stepName} — ${dur}, ${step.numTurns} turns`);
   } else {
     log(`  ❌ ${step.stepName} — FAILED: ${step.error}`);
   }
@@ -347,7 +414,6 @@ function printSummary(state: InvestigationState): void {
   log("");
   log(`   Case:     ${state.caseId}`);
   log(`   Duration: ${formatDuration(totalMs)}`);
-  log(`   Cost:     $${state.totalCostUsd.toFixed(4)}`);
   log(`   Steps:    ${state.steps.length}`);
   log(`   Report:   ${state.caseDir}/report.md`);
   log("");
@@ -356,7 +422,7 @@ function printSummary(state: InvestigationState): void {
   for (const step of state.steps) {
     const icon = step.success ? "✅" : "❌";
     const dur = formatDuration(step.durationMs).padStart(6);
-    log(`   ${icon} ${step.stepName.padEnd(35)} ${dur}  $${step.costUsd.toFixed(4).padStart(8)}  ${step.numTurns} turns`);
+    log(`   ${icon} ${step.stepName.padEnd(35)} ${dur}  ${step.numTurns} turns`);
   }
   log("═══════════════════════════════════════════════");
 }

@@ -21,6 +21,7 @@ const MCP_BASE_TOOLS = [
 export class QuotaExhaustedError extends Error {
   numTurns: number;
   durationMs: number;
+  stderr: string;
 
   constructor(agentName: string, numTurns: number, durationMs: number, stderr: string) {
     const hint = stderr.trim() ? ` | stderr: ${stderr.trim().slice(0, 300)}` : "";
@@ -28,7 +29,89 @@ export class QuotaExhaustedError extends Error {
     this.name = "QuotaExhaustedError";
     this.numTurns = numTurns;
     this.durationMs = durationMs;
+    this.stderr = stderr;
   }
+}
+
+export function parseResetTime(stderr: string): number | null {
+  if (!stderr) return null;
+  const lower = stderr.toLowerCase();
+
+  const retryAfterMatch = lower.match(/retry[\s-]*after[\s:]*(\d+)/);
+  if (retryAfterMatch) {
+    const seconds = parseInt(retryAfterMatch[1], 10);
+    if (seconds > 0 && seconds < 86400) return seconds * 1000;
+  }
+
+  const resetInMatch = lower.match(/resets?\s+in\s+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hours?)/);
+  if (resetInMatch) {
+    const value = parseInt(resetInMatch[1], 10);
+    const unit = resetInMatch[2][0];
+    const multiplier = unit === "h" ? 3600000 : unit === "m" ? 60000 : 1000;
+    const ms = value * multiplier;
+    if (ms > 0 && ms < 86400000) return ms;
+  }
+
+  return null;
+}
+
+export interface QuotaProbeResult {
+  available: boolean;
+  retryAfterMs: number | null;
+  stderr: string;
+}
+
+export async function probeQuota(model: string): Promise<QuotaProbeResult> {
+  return new Promise<QuotaProbeResult>((resolve) => {
+    const proc = spawn("claude", [
+      "-p",
+      "--output-format", "json",
+      "--model", model,
+      "--max-tokens", "5",
+      "--no-session-persistence",
+    ], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    const timeout = setTimeout(() => {
+      proc.kill("SIGTERM");
+      resolve({ available: false, retryAfterMs: null, stderr: "probe timed out" });
+    }, 15_000);
+
+    proc.stdout!.on("data", (data: Buffer) => { stdout += data.toString(); });
+    proc.stderr!.on("data", (data: Buffer) => { stderr += data.toString(); });
+
+    proc.stdin!.write("Reply OK");
+    proc.stdin!.end();
+
+    proc.on("close", (code) => {
+      clearTimeout(timeout);
+      try {
+        const result = JSON.parse(stdout);
+        const turns = result.num_turns ?? 0;
+        const duration = result.duration_ms ?? 0;
+        if (code === 0 && turns >= 1 && duration >= HOLLOW_SESSION_MAX_MS) {
+          resolve({ available: true, retryAfterMs: null, stderr });
+          return;
+        }
+      } catch {
+        // non-JSON output — treat as unavailable
+      }
+      resolve({
+        available: false,
+        retryAfterMs: parseResetTime(stderr),
+        stderr,
+      });
+    });
+
+    proc.on("error", () => {
+      clearTimeout(timeout);
+      resolve({ available: false, retryAfterMs: null, stderr: "failed to spawn claude" });
+    });
+  });
 }
 
 const HOLLOW_SESSION_MAX_TURNS = 1;
