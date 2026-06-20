@@ -1,5 +1,6 @@
 .archives/
 node_modules/
+dist/
 package-lock.json
 TODO.md
 TODO-domain.md

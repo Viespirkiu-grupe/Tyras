@@ -44,6 +44,23 @@ ORDER BY y.cpvGrupe, y.metai, y.suma DESC
 LIMIT 100;
 ```
 
+```sql
+-- Supplier participation and wins per CPV per year from v_dalyviai (CVP IS, ~400 procurements).
+-- A supplier present in year A but absent in year B while a peer wins — and vice versa — is the rotation signature.
+SELECT DATE_TRUNC('year', "ataskaitosData"::date)::date AS metai,
+       LEFT("pagrindinisKodasBvpz", 3)                  AS cpvGrupe,
+       "tiekejoKodas",
+       MAX(tiekejas)                                     AS tiekejas,
+       COUNT(DISTINCT "pirkimoNumeris")                  AS dalyvavimas,
+       COUNT(DISTINCT "pirkimoNumeris") FILTER
+           (WHERE "eileNumeris" = 1)                    AS laimejimai
+FROM v_dalyviai
+WHERE "pagrindinisKodasBvpz" IS NOT NULL
+GROUP BY 1, 2, 3
+ORDER BY cpvGrupe, metai, laimejimai DESC
+LIMIT 60;
+```
+
 ## Followup
 
 For human investigator: potential KT interest is high — bid rotation is classic cartel behaviour. STT may focus on cases

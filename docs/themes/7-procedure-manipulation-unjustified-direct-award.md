@@ -12,6 +12,14 @@ adequate justification.
 - **Supervisory authorities:** STT, VPT, VK
 - **OSINT sources:** audit reports, media
 
+## Benchmarks / Context
+
+- High MVPŽ/MVP (small-value / verbal procedure) **count share** is normal Lithuania-wide — municipalities inevitably
+  run many small contracts. A buyer reporting 90 %+ of procurement _procedures_ as MVPŽ/MVP is unremarkable on its own.
+- Always assess by **value share**, not procedure count. If a large fraction of _total contract value_ flows through
+  informal small-value procedures, that signals threshold manipulation (see theme 5) or deliberate avoidance of open
+  competition.
+
 ## To Detect
 
 - Direct-negotiation value share vs. open competition by buyer and CPV over time.

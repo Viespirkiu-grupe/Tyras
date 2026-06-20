@@ -1,17 +1,24 @@
 {
   "name": "tyras",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Lithuanian public procurement fraud investigation pipeline",
+  "type": "module",
   "scripts": {
+    "investigate": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
     "format": "prettier --write \"**/*.md\"",
     "format:check": "prettier --check \"**/*.md\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "devDependencies": {
-    "prettier": "^3.8.3"
+    "@types/node": "^22.0.0",
+    "prettier": "^3.8.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.9"
   }
 }

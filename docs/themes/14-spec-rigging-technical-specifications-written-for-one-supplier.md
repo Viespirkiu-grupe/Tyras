@@ -45,8 +45,9 @@ ORDER BY laimejimuKiekis DESC
 LIMIT 30;
 ```
 
-2. **Confirm single-bidding (ATN-1 file).** For the shortlisted procurements, `get_viesasis_pirkimas` →
-   `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` and count the `VI. DALYVIAI` rows — one bidder confirms the
-   tender was uncontested.
+2. **Confirm single-bidding.** First check `v_dalyviai`:
+   `SELECT COUNT(DISTINCT "tiekejoKodas") FROM v_dalyviai WHERE "pirkimoNumeris" = '...'` — one bidder confirms
+   single-bidding without file reading. If the procurement is not in `v_dalyviai`, use `get_viesasis_pirkimas` →
+   `get_failas_tekstas(<fileId>, puslapis=4, kiekis=4)` and count the `VI. DALYVIAI` rows.
 3. **Read the specification.** Pull the tender's technical-requirements document (`search_failai` /
    `get_failas_tekstas`) and look for brand/model-specific or otherwise exclusionary language that fits only the winner.
