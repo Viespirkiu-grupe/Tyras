@@ -23,11 +23,10 @@ function makeInputs(overrides: Partial<InvestigatorInputs> = {}): InvestigatorIn
     caseDir: "investigations/case-1",
     dossierPath: "investigations/case-1/dossier.md",
     planPath: "investigations/case-1/plan.md",
-    themeIndex: 3,
+    themeCode: 3,
     themeName: "contracts",
     themeDocument: "docs/themes/contracts.md",
     outputPath: "investigations/case-1/theme-03-contracts.md",
-    nextThemeIndex: 4,
     dossierContent: "Dossier content here",
     themeDocContent: "Theme doc content",
     ...overrides,
@@ -54,8 +53,8 @@ describe("InvestigatorAgent", () => {
     expect(agent.stepName).toBe("theme-03-contracts");
   });
 
-  it("stepName pads single-digit index", () => {
-    const agent = new InvestigatorAgent(makeWorkspace(), makeInputs({ themeIndex: 1 }));
+  it("stepName pads single-digit theme code", () => {
+    const agent = new InvestigatorAgent(makeWorkspace(), makeInputs({ themeCode: 1 }));
     expect(agent.stepName).toBe("theme-01-contracts");
   });
 
@@ -87,18 +86,6 @@ describe("InvestigatorAgent", () => {
     const agent = new InvestigatorAgent(makeWorkspace(), makeInputs());
     const msg = agent.buildUserMessage();
     expect(msg).toContain("use the Read tool");
-  });
-
-  it("buildUserMessage marks last theme when nextThemeIndex is 0", () => {
-    const agent = new InvestigatorAgent(makeWorkspace(), makeInputs({ nextThemeIndex: 0 }));
-    const msg = agent.buildUserMessage();
-    expect(msg).toContain("(you are the LAST theme)");
-  });
-
-  it("buildUserMessage does not mark last theme for non-zero nextThemeIndex", () => {
-    const agent = new InvestigatorAgent(makeWorkspace(), makeInputs({ nextThemeIndex: 4 }));
-    const msg = agent.buildUserMessage();
-    expect(msg).not.toContain("(you are the LAST theme)");
   });
 
   it("outputPath comes from inputs", () => {

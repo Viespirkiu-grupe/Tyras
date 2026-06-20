@@ -14,11 +14,11 @@ export class InvestigatorAgent extends FileOutputAgent {
   }
 
   get stepName(): string {
-    return `theme-${String(this.inputs.themeIndex).padStart(2, "0")}-${this.inputs.themeName}`;
+    return `theme-${String(this.inputs.themeCode).padStart(2, "0")}-${this.inputs.themeName}`;
   }
 
   get agentName(): string {
-    return `investigator-${this.inputs.themeIndex}`;
+    return `investigator-${this.inputs.themeCode}`;
   }
 
   get outputPath(): string {
@@ -34,12 +34,11 @@ export class InvestigatorAgent extends FileOutputAgent {
 
 **Case ID:** ${this.inputs.caseId}
 **Date:** ${this.todayDate()}
-**Theme index:** ${this.inputs.themeIndex}
+**Theme code:** ${this.inputs.themeCode}
 **Theme name:** ${this.inputs.themeName}
 **Output path:** ${this.inputs.outputPath}
 **Dossier path:** ${this.inputs.dossierPath}
 **Plan path:** ${this.inputs.planPath}
-**Next theme index:** ${this.inputs.nextThemeIndex} ${this.inputs.nextThemeIndex === 0 ? "(you are the LAST theme)" : ""}
 
 ---
 

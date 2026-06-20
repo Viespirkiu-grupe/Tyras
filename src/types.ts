@@ -1,6 +1,6 @@
 export interface ThemeEntry {
-  index: number;
-  name: string;
+  themeCode: number;
+  themeName: string;
   themeDocument: string;
   outputPath: string;
   priority: "High" | "Medium" | "Low";
@@ -18,11 +18,10 @@ export interface InvestigatorInputs {
   caseDir: string;
   dossierPath: string;
   planPath: string;
-  themeIndex: number;
+  themeCode: number;
   themeName: string;
   themeDocument: string;
   outputPath: string;
-  nextThemeIndex: number;
   dossierContent: string;
   themeDocContent: string;
 }
