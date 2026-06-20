@@ -110,7 +110,7 @@ async function runPipeline(
     log("");
     log(`   📌 Plan: ${plan.themes.length} themes selected`);
     for (const t of plan.themes) {
-      log(`      ${t.index}. ${t.name} [${t.priority}]`);
+      log(`      Theme ${t.themeCode}: ${t.themeName} [${t.priority}]`);
     }
     log("");
   } else {
@@ -122,7 +122,7 @@ async function runPipeline(
   if (state.status === "investigating") {
     log("🔎 Phase 2: Investigation");
     log("");
-    const pendingThemes = plan.themes.filter((t) => !state.completedThemes.includes(t.index));
+    const pendingThemes = plan.themes.filter((t) => !state.completedThemes.includes(t.themeCode));
 
     if (CONFIG.parallelThemes) {
       await runThemesParallel(workspace, plan, pendingThemes, state);
@@ -170,7 +170,6 @@ async function buildInvestigatorInputs(
   workspace: IWorkspace,
   plan: PlannerHandoff,
   theme: PlannerHandoff["themes"][number],
-  nextThemeIndex: number,
   state: InvestigationState,
 ): Promise<InvestigatorInputs> {
   const dossierContent = await workspace.readFile(plan.dossierPath);
@@ -181,11 +180,10 @@ async function buildInvestigatorInputs(
     caseDir: state.caseDir,
     dossierPath: plan.dossierPath,
     planPath: plan.planPath,
-    themeIndex: theme.index,
-    themeName: theme.name,
+    themeCode: theme.themeCode,
+    themeName: theme.themeName,
     themeDocument: theme.themeDocument,
     outputPath: theme.outputPath,
-    nextThemeIndex,
     dossierContent,
     themeDocContent,
   };
@@ -199,20 +197,21 @@ async function runThemesSequential(
 ): Promise<void> {
   for (let i = 0; i < themes.length; i++) {
     const theme = themes[i];
-    const nextThemeIndex = i + 1 < themes.length ? themes[i + 1].index : 0;
+    const done = state.completedThemes.length;
+    const total = plan.themes.length;
 
-    log(`  📌 Theme ${theme.index}/${plan.themes.length}: ${theme.name} [${theme.priority}]`);
+    log(`  📌 Theme ${theme.themeCode} (${done + 1}/${total}): ${theme.themeName} [${theme.priority}]`);
 
-    await ensureQuotaAvailable(`investigator-${theme.index}`);
+    await ensureQuotaAvailable(`investigator-${theme.themeCode}`);
 
-    const inputs = await buildInvestigatorInputs(workspace, plan, theme, nextThemeIndex, state);
+    const inputs = await buildInvestigatorInputs(workspace, plan, theme, state);
 
-    const { step } = await withRetry(`investigator-${theme.index}`, () =>
+    const { step } = await withRetry(`investigator-${theme.themeCode}`, () =>
       runInvestigator(workspace, inputs, CONFIG.model),
     );
     recordStep(state, step);
     formatDocuments(state.caseDir);
-    state.completedThemes.push(theme.index);
+    state.completedThemes.push(theme.themeCode);
     await workspace.saveState(state.caseDir, state);
     log("");
   }
@@ -227,16 +226,16 @@ async function runThemesParallel(
   const [first, ...rest] = themes;
 
   if (first) {
-    log(`  📌 Theme ${first.index}: ${first.name} [sequential baseline]`);
-    const inputs = await buildInvestigatorInputs(
-      workspace, plan, first, rest.length > 0 ? rest[0].index : 0, state,
-    );
-    const { step } = await withRetry(`investigator-${first.index}`, () =>
+    const done = state.completedThemes.length;
+    const total = plan.themes.length;
+    log(`  📌 Theme ${first.themeCode} (${done + 1}/${total}): ${first.themeName} [sequential baseline]`);
+    const inputs = await buildInvestigatorInputs(workspace, plan, first, state);
+    const { step } = await withRetry(`investigator-${first.themeCode}`, () =>
       runInvestigator(workspace, inputs, CONFIG.model),
     );
     recordStep(state, step);
     formatDocuments(state.caseDir);
-    state.completedThemes.push(first.index);
+    state.completedThemes.push(first.themeCode);
     await workspace.saveState(state.caseDir, state);
     log("");
   }
@@ -245,21 +244,17 @@ async function runThemesParallel(
   for (let batchStart = 0; batchStart < rest.length; batchStart += BATCH_SIZE) {
     const batch = rest.slice(batchStart, batchStart + BATCH_SIZE);
 
-    await ensureQuotaAvailable(`batch-${batch.map((t) => t.index).join(",")}`);
+    await ensureQuotaAvailable(`batch-${batch.map((t) => t.themeCode).join(",")}`);
 
-    log(`  ⚡ Parallel batch: themes ${batch.map((t) => t.index).join(", ")}`);
+    log(`  ⚡ Parallel batch: themes ${batch.map((t) => t.themeCode).join(", ")}`);
 
     const batchInputs = await Promise.all(
-      batch.map((theme, i) => {
-        const globalIdx = batchStart + i;
-        const nextIdx = globalIdx + 1 < rest.length ? rest[globalIdx + 1].index : 0;
-        return buildInvestigatorInputs(workspace, plan, theme, nextIdx, state);
-      }),
+      batch.map((theme) => buildInvestigatorInputs(workspace, plan, theme, state)),
     );
 
     const results = await Promise.allSettled(
       batchInputs.map((inputs) =>
-        withRetry(`investigator-${inputs.themeIndex}`, () =>
+        withRetry(`investigator-${inputs.themeCode}`, () =>
           runInvestigator(workspace, inputs, CONFIG.model),
         ),
       ),
@@ -269,10 +264,10 @@ async function runThemesParallel(
       const r = results[i];
       if (r.status === "fulfilled") {
         recordStep(state, r.value.step);
-        state.completedThemes.push(batch[i].index);
+        state.completedThemes.push(batch[i].themeCode);
       } else {
         const failStep: StepResult = {
-          stepName: `theme-${String(batch[i].index).padStart(2, "0")}-${batch[i].name}`,
+          stepName: `theme-${String(batch[i].themeCode).padStart(2, "0")}-${batch[i].themeName}`,
           durationMs: 0,
           duration: "0s",
           costUsd: 0,

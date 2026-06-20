@@ -15,7 +15,7 @@ const VALID_HANDOFF = {
   dossierPath: "investigations/case-1/dossier.md",
   planPath: "investigations/case-1/plan.md",
   themes: [
-    { index: 1, name: "contracts", themeDocument: "docs/themes/contracts.md", outputPath: "investigations/case-1/theme-01-contracts.md", priority: "High" },
+    { themeCode: 1, themeName: "contracts", themeDocument: "docs/themes/contracts.md", outputPath: "investigations/case-1/theme-01-contracts.md", priority: "High" },
   ],
 };
 

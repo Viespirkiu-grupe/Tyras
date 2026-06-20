@@ -47,7 +47,7 @@ administrative offense.
 
 ### Step 1 — Read all source documents
 
-Use the Read tool for: dossier.md, plan.md, then all theme-NN-*.md files in index order.
+Use the Read tool for: dossier.md, plan.md, then all theme-NN-*.md files.
 
 ### Step 2 — Pre-writing audit
 

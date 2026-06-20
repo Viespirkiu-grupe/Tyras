@@ -70,12 +70,12 @@ Use the Write tool to create `{{CASE_DIR}}/dossier.md` with this structure:
 
 ## Investigation Themes
 
-| # | Theme | Document | Priority |
+| Theme Code | Theme | Document | Priority |
 | 1 | ... | docs/themes/1-shell-company-or-capacity-mismatch.md | High |
 
 ## Agent Chain
 
-| Order | Theme | Agent output file | Status |
+| Theme Code | Theme | Agent output file | Status |
 | 1 | ... | theme-01-....md | pending |
 ```
 
@@ -105,8 +105,8 @@ End your final text response with a fenced JSON block containing the structured 
   "planPath": "{{CASE_DIR}}/plan.md",
   "themes": [
     {
-      "index": 1,
-      "name": "shell-company",
+      "themeCode": 1,
+      "themeName": "shell-company",
       "themeDocument": "docs/themes/1-shell-company-or-capacity-mismatch.md",
       "outputPath": "{{CASE_DIR}}/theme-01-shell-company.md",
       "priority": "High"
@@ -115,6 +115,8 @@ End your final text response with a fenced JSON block containing the structured 
 }
 ```
 
+**Important:** `themeCode` must be the actual theme number from the filename (e.g. `8` for `8-price-anomalies-...`), NOT a sequential order number. The `outputPath` filename must also use the theme code zero-padded (e.g. `theme-08-price-anomalies.md`).
+
 ## Rules
 
 - Write the dossier before the plan.
@@ -122,4 +124,4 @@ End your final text response with a fenced JSON block containing the structured 
 - Theme document paths must be exact — investigators open them directly.
 - QUANTITATIVE CLAIMS RULE applies: back every number with execute_query.
 - Use "alleged / suspected / evidence suggests" — no definitive accusations.
-- Folder and filenames: lowercase-with-hyphens, zero-padded theme index.
+- Folder and filenames: lowercase-with-hyphens, zero-padded theme code (e.g. `theme-08-...` for theme 8).

@@ -41,7 +41,7 @@ Use the Write tool to create the findings file at the output path provided. Stru
 ```markdown
 # Theme Investigation: <Theme Name>
 
-**Case:** <case_id>  **Theme document:** <theme_document>  **Agent index:** <theme_index>  **Date:** <today>
+**Case:** <case_id>  **Theme document:** <theme_document>  **Theme code:** <theme_code>  **Date:** <today>
 
 ## Summary
 
@@ -87,7 +87,7 @@ High / Medium / Low — with rationale.
 Use the Edit tool on the dossier to append under `## Theme Findings Summary`:
 
 ```markdown
-### Theme <index>: <name>
+### Theme <theme_code>: <name>
 
 **Status:** Complete  **Key finding:** <one sentence>  **New entities:** <list or "none">  **Supervisory authority:
 ** <authority>  **File:** <output_path>
@@ -105,4 +105,4 @@ Append MCP tool issues to `{{CASE_DIR}}/tech-report.md` per CLAUDE.md tech-repor
 - Record raw MCP results in full — do not summarize away detail.
 - If MCP returns no data, record that explicitly — absence is a finding.
 - Use "alleged / suspected / evidence suggests" — no definitive accusations.
-- Filenames: lowercase-with-hyphens, zero-padded index.
+- Filenames: lowercase-with-hyphens, zero-padded theme code (e.g. `theme-08-...` for theme 8).

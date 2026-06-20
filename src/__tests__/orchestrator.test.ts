@@ -61,8 +61,8 @@ const HANDOFF: PlannerHandoff = {
   dossierPath: "investigations/test-case/dossier.md",
   planPath: "investigations/test-case/plan.md",
   themes: [
-    { index: 1, name: "contracts", themeDocument: "docs/themes/01.md", outputPath: "investigations/test-case/theme-01-contracts.md", priority: "High" },
-    { index: 2, name: "persons", themeDocument: "docs/themes/02.md", outputPath: "investigations/test-case/theme-02-persons.md", priority: "Medium" },
+    { themeCode: 1, themeName: "contracts", themeDocument: "docs/themes/01.md", outputPath: "investigations/test-case/theme-01-contracts.md", priority: "High" },
+    { themeCode: 2, themeName: "persons", themeDocument: "docs/themes/02.md", outputPath: "investigations/test-case/theme-02-persons.md", priority: "Medium" },
   ],
 };
 
